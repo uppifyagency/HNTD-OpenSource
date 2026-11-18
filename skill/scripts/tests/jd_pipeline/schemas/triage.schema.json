@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["clusters", "isolated"],
+  "properties": {
+    "clusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "logins", "scoreRange"],
+        "properties": {
+          "id": {"type": "integer", "minimum": 0},
+          "logins": {"type": "array", "items": {"type": "string"}, "minItems": 2},
+          "scoreRange": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+          "size": {"type": "integer"},
+          "forcedAI": {"type": "boolean"}
+        }
+      }
+    },
+    "isolated": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["login", "score", "normalizedScore"],
+        "properties": {
+          "login": {"type": "string"},
+          "score": {"type": "number"},
+          "normalizedScore": {"type": "number"}
+        }
+      }
+    }
+  }
+}

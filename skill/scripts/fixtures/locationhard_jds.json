@@ -1,0 +1,79 @@
+[
+  {
+    "id": "it-onsite-milan",
+    "lang": "it",
+    "jd": "Cerchiamo uno sviluppatore backend. Sede di Milano obbligatoria, lavoro in presenza. Non è previsto smart working.",
+    "expected": true,
+    "note": "rule 1 + rule 3 + rule 4 — 'in presenza' on-site (rule 1 matches first), no remote, obligatory Milan office"
+  },
+  {
+    "id": "it-relocation",
+    "lang": "it",
+    "jd": "Posizione per sviluppatore senior. È richiesto trasferimento a Torino entro il primo mese.",
+    "expected": true,
+    "note": "rule 2 — mandatory relocation to Torino"
+  },
+  {
+    "id": "en-onsite-berlin",
+    "lang": "en",
+    "jd": "Backend engineer wanted. This is an on-site role in Berlin, no remote work available.",
+    "expected": true,
+    "note": "rule 1 + rule 3 — on-site Berlin, remote excluded"
+  },
+  {
+    "id": "en-hybrid-2days",
+    "lang": "en",
+    "jd": "We offer a hybrid setup — 2 days/week in the London office, the rest remote.",
+    "expected": true,
+    "note": "rule 5 (hybrid rule) — mandated in-office cadence"
+  },
+  {
+    "id": "it-hybrid-1day",
+    "lang": "it",
+    "jd": "Lavoro ibrido, 1 giorno a settimana in sede a Roma. Stack moderno e team affiatato.",
+    "expected": true,
+    "note": "rule 5 (hybrid rule) — one mandated in-office day per week"
+  },
+  {
+    "id": "en-remote-pref",
+    "lang": "en",
+    "jd": "Fully remote backend position, preferably Italy-based candidates for timezone convenience.",
+    "expected": false,
+    "note": "rule 6 — remote with location preference only, not a filter"
+  },
+  {
+    "id": "en-remote-tz-only",
+    "lang": "en",
+    "jd": "Fully remote role. You must overlap CET working hours with the rest of the team.",
+    "expected": false,
+    "note": "rule 7 — timezone overlap only, not geography"
+  },
+  {
+    "id": "it-remote-tz-only",
+    "lang": "it",
+    "jd": "Sviluppatore da remoto. È richiesta la sovrapposizione del fuso orario CET con il team.",
+    "expected": false,
+    "note": "rule 7 — timezone overlap only (IT), not geography"
+  },
+  {
+    "id": "en-fully-remote",
+    "lang": "en",
+    "jd": "100% remote engineering role. Work from anywhere — we are a distributed company.",
+    "expected": false,
+    "note": "rule 8 — fully remote, no location signal at all"
+  },
+  {
+    "id": "it-ambiguous",
+    "lang": "it",
+    "jd": "Sviluppatore backend per il nostro team di Milano. Stack moderno, progetti interessanti.",
+    "expected": true,
+    "note": "rule 9 (conservative) — a city is named but with NO presence / remote / relocation language and NO soft signal"
+  },
+  {
+    "id": "en-hybrid-optional",
+    "lang": "en",
+    "jd": "This is a remote-first team; an office is available if you prefer to work on-site.",
+    "expected": false,
+    "note": "rule 5 exception — in-office portion is explicitly optional"
+  }
+]

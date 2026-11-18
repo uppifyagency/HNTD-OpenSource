@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["login", "deterministicRank", "languageFitScore", "collaborationScore", "projectMaturityScore", "forcedAI"],
+  "properties": {
+    "login": {"type": "string"},
+    "deterministicRank": {"type": "number", "minimum": 0, "maximum": 100},
+    "languageFitScore": {"type": "number", "minimum": 0, "maximum": 100},
+    "collaborationScore": {"type": "number", "minimum": 0, "maximum": 100},
+    "projectMaturityScore": {"type": "number", "minimum": 0, "maximum": 100},
+    "codeQualityScore": {"type": ["number", "null"]},
+    "prefilterBoostNormalized": {"type": "number", "minimum": 0},
+    "forcedAI": {"type": "boolean"}
+  }
+}

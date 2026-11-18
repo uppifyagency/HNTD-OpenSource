@@ -1,0 +1,243 @@
+[
+  {
+    "login": "alice-fullstack",
+    "name": "Alice Developer",
+    "email": "alice@example.com",
+    "location": "Milan, Italy",
+    "company": "Tech Corp",
+    "bio": "Senior full-stack developer. React, Node.js, TypeScript.",
+    "followers": 340,
+    "publicRepos": 25,
+    "following": 120,
+    "hireable": true,
+    "twitterUsername": "alice_dev",
+    "githubCreatedAt": "2018-03-15T00:00:00Z",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/1001",
+    "githubId": 1001,
+    "blog": "https://alice.dev",
+    "profileUrl": "https://github.com/alice-fullstack",
+    "topLanguages": ["JavaScript", "TypeScript", "CSS"],
+    "topRepos": [
+      {
+        "name": "react-dashboard",
+        "fullName": "alice-fullstack/react-dashboard",
+        "description": "Modern React dashboard with TypeScript",
+        "language": "TypeScript",
+        "languages": {"TypeScript": 180000, "JavaScript": 40000, "CSS": 15000},
+        "stars": 120,
+        "forks": 28,
+        "url": "https://github.com/alice-fullstack/react-dashboard",
+        "topics": ["react", "typescript", "dashboard"],
+        "pushedAt": "2026-03-10T08:00:00Z",
+        "license": "MIT",
+        "directoryListing": ["src/", "tests/", "package.json", "tsconfig.json", ".github/", "README.md"],
+        "dependencyFile": {"path": "package.json", "content": "{\"dependencies\":{\"react\":\"^18.2.0\",\"typescript\":\"^5.0.0\",\"@testing-library/react\":\"^14.0.0\"}}"},
+        "sourceFiles": [{"path": "src/App.tsx", "content": "import React from 'react';\nimport { Dashboard } from './components/Dashboard';\n\nexport const App: React.FC = () => {\n  return <Dashboard />;\n};"}],
+        "commits": [
+          {"sha": "abc001", "message": "feat: add chart component with responsive layout", "date": "2026-03-10T08:00:00Z"},
+          {"sha": "abc002", "message": "test: add unit tests for Dashboard", "date": "2026-03-09T12:00:00Z"},
+          {"sha": "abc003", "message": "refactor: extract hooks into custom useData hook", "date": "2026-03-08T15:00:00Z"}
+        ]
+      },
+      {
+        "name": "node-api",
+        "fullName": "alice-fullstack/node-api",
+        "description": "Express REST API with TypeScript",
+        "language": "TypeScript",
+        "languages": {"TypeScript": 95000, "JavaScript": 5000},
+        "stars": 45,
+        "forks": 12,
+        "url": "https://github.com/alice-fullstack/node-api",
+        "topics": ["nodejs", "express", "api", "typescript"],
+        "pushedAt": "2026-03-05T14:00:00Z",
+        "license": "MIT",
+        "directoryListing": ["src/", "tests/", "package.json", "Dockerfile", "docker-compose.yml"],
+        "dependencyFile": {"path": "package.json", "content": "{\"dependencies\":{\"express\":\"^4.18.0\",\"typescript\":\"^5.0.0\",\"jest\":\"^29.0.0\"}}"},
+        "sourceFiles": [{"path": "src/server.ts", "content": "import express from 'express';\nimport { router } from './routes';\n\nconst app = express();\napp.use('/api', router);\napp.listen(3000);"}],
+        "commits": [
+          {"sha": "def001", "message": "feat: add authentication middleware", "date": "2026-03-05T14:00:00Z"},
+          {"sha": "def002", "message": "fix: handle database connection errors", "date": "2026-03-04T09:00:00Z"}
+        ]
+      },
+      {
+        "name": "react-components",
+        "fullName": "alice-fullstack/react-components",
+        "description": "Shared React component library",
+        "language": "JavaScript",
+        "languages": {"JavaScript": 120000, "CSS": 30000},
+        "stars": 175,
+        "forks": 42,
+        "url": "https://github.com/alice-fullstack/react-components",
+        "topics": ["react", "components", "ui"],
+        "pushedAt": "2026-02-20T10:00:00Z",
+        "license": "MIT",
+        "directoryListing": ["src/", "stories/", "package.json", ".storybook/"],
+        "dependencyFile": {"path": "package.json", "content": "{\"dependencies\":{\"react\":\"^18.2.0\",\"storybook\":\"^7.0.0\"}}"},
+        "sourceFiles": [{"path": "src/Button.jsx", "content": "import React from 'react';\nexport const Button = ({ children, onClick }) => (\n  <button onClick={onClick}>{children}</button>\n);"}],
+        "commits": [
+          {"sha": "ghi001", "message": "feat: add Tooltip component", "date": "2026-02-20T10:00:00Z"}
+        ]
+      }
+    ]
+  },
+  {
+    "login": "bob-backend",
+    "name": "Bob Backend",
+    "email": null,
+    "location": "Rome, Italy",
+    "company": null,
+    "bio": "Java developer, Spring Boot enthusiast",
+    "followers": 85,
+    "publicRepos": 12,
+    "following": 30,
+    "hireable": false,
+    "twitterUsername": null,
+    "githubCreatedAt": "2019-06-01T00:00:00Z",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/1002",
+    "githubId": 1002,
+    "blog": null,
+    "profileUrl": "https://github.com/bob-backend",
+    "topLanguages": ["Java", "Shell"],
+    "topRepos": [
+      {
+        "name": "spring-microservice",
+        "fullName": "bob-backend/spring-microservice",
+        "description": "Spring Boot microservice template",
+        "language": "Java",
+        "languages": {"Java": 320000, "Shell": 5000},
+        "stars": 45,
+        "forks": 8,
+        "url": "https://github.com/bob-backend/spring-microservice",
+        "topics": ["spring-boot", "java", "microservice"],
+        "pushedAt": "2026-03-01T11:00:00Z",
+        "license": "Apache-2.0",
+        "directoryListing": ["src/", "pom.xml", "Dockerfile", "README.md"],
+        "dependencyFile": {"path": "pom.xml", "content": "<project><dependencies><dependency><groupId>org.springframework.boot</groupId></dependency></dependencies></project>"},
+        "sourceFiles": [{"path": "src/main/java/com/app/Application.java", "content": "@SpringBootApplication\npublic class Application {\n    public static void main(String[] args) {\n        SpringApplication.run(Application.class, args);\n    }\n}"}],
+        "commits": [
+          {"sha": "jkl001", "message": "feat: add health check endpoint", "date": "2026-03-01T11:00:00Z"},
+          {"sha": "jkl002", "message": "refactor: improve error handling", "date": "2026-02-28T15:00:00Z"}
+        ]
+      },
+      {
+        "name": "java-utils",
+        "fullName": "bob-backend/java-utils",
+        "description": "Java utility library",
+        "language": "Java",
+        "languages": {"Java": 200000},
+        "stars": 22,
+        "forks": 3,
+        "url": "https://github.com/bob-backend/java-utils",
+        "topics": ["java", "utilities"],
+        "pushedAt": "2026-01-15T09:00:00Z",
+        "license": null,
+        "directoryListing": ["src/", "pom.xml"],
+        "dependencyFile": {"path": "pom.xml", "content": "<project><dependencies></dependencies></project>"},
+        "sourceFiles": [{"path": "src/main/java/com/utils/StringHelper.java", "content": "public class StringHelper {\n    public static String capitalize(String s) {\n        return s.substring(0,1).toUpperCase() + s.substring(1);\n    }\n}"}],
+        "commits": [
+          {"sha": "mno001", "message": "add string utilities", "date": "2026-01-15T09:00:00Z"}
+        ]
+      }
+    ]
+  },
+  {
+    "login": "carol-junior",
+    "name": "Carol Junior",
+    "email": null,
+    "location": "Milan, Italy",
+    "company": null,
+    "bio": "Learning to code",
+    "followers": 5,
+    "publicRepos": 3,
+    "following": 50,
+    "hireable": false,
+    "twitterUsername": null,
+    "githubCreatedAt": "2025-09-01T00:00:00Z",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/1003",
+    "githubId": 1003,
+    "blog": null,
+    "profileUrl": "https://github.com/carol-junior",
+    "topLanguages": ["Python"],
+    "topRepos": [
+      {
+        "name": "flask-todo",
+        "fullName": "carol-junior/flask-todo",
+        "description": "Simple todo app with Flask",
+        "language": "Python",
+        "languages": {"Python": 85000, "HTML": 5000},
+        "stars": 2,
+        "forks": 0,
+        "url": "https://github.com/carol-junior/flask-todo",
+        "topics": ["flask", "python", "todo"],
+        "pushedAt": "2025-12-20T16:00:00Z",
+        "license": null,
+        "directoryListing": ["app.py", "requirements.txt", "templates/"],
+        "dependencyFile": {"path": "requirements.txt", "content": "flask==3.0.0\nsqlalchemy==2.0.0"},
+        "sourceFiles": [{"path": "app.py", "content": "from flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    return 'Hello World'"}],
+        "commits": [
+          {"sha": "pqr001", "message": "initial commit", "date": "2025-12-20T16:00:00Z"}
+        ]
+      }
+    ]
+  },
+  {
+    "login": "dave-devops",
+    "name": "Dave DevOps",
+    "email": "dave@example.org",
+    "location": "Milan, Italy",
+    "company": "DevOps Inc",
+    "bio": "Infrastructure as code. Terraform, Go, Kubernetes.",
+    "followers": 210,
+    "publicRepos": 18,
+    "following": 65,
+    "hireable": true,
+    "twitterUsername": null,
+    "githubCreatedAt": "2017-01-10T00:00:00Z",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/1004",
+    "githubId": 1004,
+    "blog": "https://dave-devops.io",
+    "profileUrl": "https://github.com/dave-devops",
+    "topLanguages": ["HCL", "Go", "Shell"],
+    "topRepos": [
+      {
+        "name": "terraform-aws",
+        "fullName": "dave-devops/terraform-aws",
+        "description": "Production-ready AWS Terraform modules",
+        "language": "HCL",
+        "languages": {"HCL": 180000, "Shell": 25000},
+        "stars": 180,
+        "forks": 35,
+        "url": "https://github.com/dave-devops/terraform-aws",
+        "topics": ["terraform", "aws", "infrastructure"],
+        "pushedAt": "2026-03-12T07:00:00Z",
+        "license": "MIT",
+        "directoryListing": ["modules/", "examples/", "main.tf", "variables.tf", "outputs.tf", "README.md"],
+        "dependencyFile": null,
+        "sourceFiles": [{"path": "main.tf", "content": "terraform {\n  required_version = \">= 1.5\"\n  required_providers {\n    aws = { source = \"hashicorp/aws\" }\n  }\n}"}],
+        "commits": [
+          {"sha": "stu001", "message": "feat: add ECS Fargate module", "date": "2026-03-12T07:00:00Z"},
+          {"sha": "stu002", "message": "docs: update README with examples", "date": "2026-03-11T10:00:00Z"}
+        ]
+      },
+      {
+        "name": "go-cli",
+        "fullName": "dave-devops/go-cli",
+        "description": "CLI tool for infrastructure management",
+        "language": "Go",
+        "languages": {"Go": 190000},
+        "stars": 65,
+        "forks": 12,
+        "url": "https://github.com/dave-devops/go-cli",
+        "topics": ["go", "cli", "devops"],
+        "pushedAt": "2026-02-28T13:00:00Z",
+        "license": "MIT",
+        "directoryListing": ["cmd/", "internal/", "go.mod", "go.sum", "Makefile"],
+        "dependencyFile": {"path": "go.mod", "content": "module github.com/dave-devops/go-cli\n\ngo 1.21\n\nrequire github.com/spf13/cobra v1.8.0"},
+        "sourceFiles": [{"path": "cmd/root.go", "content": "package cmd\n\nimport \"github.com/spf13/cobra\"\n\nvar rootCmd = &cobra.Command{\n  Use: \"infra-cli\",\n}"}],
+        "commits": [
+          {"sha": "vwx001", "message": "feat: add deploy command", "date": "2026-02-28T13:00:00Z"}
+        ]
+      }
+    ]
+  }
+]

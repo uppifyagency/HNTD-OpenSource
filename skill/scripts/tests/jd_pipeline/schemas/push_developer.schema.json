@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["githubId", "login", "profileUrl", "followers", "publicRepos", "topLanguages", "topRepos", "indexedAt", "updatedAt"],
+  "properties": {
+    "githubId": {"type": "string"},
+    "login": {"type": "string"},
+    "name": {"type": ["string", "null"]},
+    "email": {"type": ["string", "null"]},
+    "location": {"type": ["string", "null"]},
+    "bio": {"type": ["string", "null"]},
+    "blog": {"type": ["string", "null"]},
+    "avatarUrl": {"type": ["string", "null"]},
+    "followers": {"type": "number", "minimum": 0},
+    "publicRepos": {"type": "number", "minimum": 0},
+    "profileUrl": {"type": "string"},
+    "topLanguages": {"type": "array", "items": {"type": "string"}},
+    "topRepos": {"type": "array"},
+    "indexedAt": {"type": "number"},
+    "updatedAt": {"type": "number"},
+    "score": {"type": "number"},
+    "scoreComment": {"type": "string"},
+    "scoreBreakdown": {"type": "object"},
+    "objectiveScore": {"type": "number"},
+    "normalizedScore": {"type": "number"},
+    "poolCategory": {"type": "string"},
+    "jdScoreBreakdown": {"type": "object"},
+    "jdAssessment": {"type": "string"},
+    "matchConfidence": {"type": "number"},
+    "matchReason": {"type": "string"}
+  }
+}

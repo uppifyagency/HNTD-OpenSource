@@ -1,0 +1,710 @@
+/* ============================================================
+   HNTD INTEL · editorial skin (ADDITIVE, scoped)
+   Source of truth: docs/hntd-redesign-v2/shared/{tokens,components}.css
+   Loaded by globals.css. Activates ONLY under `.skin-editorial`.
+   The V4 `:root` is untouched — the running app is unaffected.
+   Fonts come from next/font CSS variables (Connascence of Name).
+   ============================================================ */
+
+.skin-editorial {
+  /* ── Palette (verbatim from tokens.css) ──────────────── */
+  --paper:    #f4f1ea;
+  --paper-2:  #ebe8df;
+  --paper-3:  #e2deD2;
+  --ink:      #0a0a0a;
+  --ink-2:    #2a2a28;
+  --rule:     #1a1a1a;
+  --rule-2:   #c9c4b5;
+  --dim:      #6b6a64;
+  --mute:     #d8d4ca;
+  --ed-accent:   #1f7a4d;   /* editorial brand green — own name; shadcn's --accent below is an HSL triplet and would clobber this if shared (Connascence collision) */
+  --ed-accent-2: #166442;
+  --alert:    #a8341d;
+  --warn:     #9a7619;
+
+  /* ── Type scale ──────────────────────────────────────── */
+  --t-12: 12px; --t-13: 13px; --t-14: 14px; --t-15: 15px; --t-16: 16px;
+  --t-18: 18px; --t-20: 20px; --t-24: 24px; --t-32: 32px; --t-40: 40px;
+  --t-48: 48px; --t-64: 64px; --t-80: 80px; --t-96: 96px; --t-128: 128px;
+
+  /* ── Spacing / layout / lines / motion ───────────────── */
+  --s-4: 4px; --s-8: 8px; --s-12: 12px; --s-16: 16px;
+  --s-24: 24px; --s-32: 32px; --s-48: 48px; --s-64: 64px; --s-96: 96px; --s-128: 128px;
+  --container: 1320px; --gutter: 24px; --pad-x: 40px;
+  --hair: 1px; --rule-w: 1.5px; --frame-w: 1.5px;
+  --ease: cubic-bezier(.2,.7,.2,1);
+  --dur-fast: .18s; --dur: .35s; --dur-slow: .9s;
+
+  /* ── shadcn token remap (HSL triplets — Migrate-ready) ──
+     Keep the triplet format: shadcn wraps these in hsl().
+     Under this scope, existing Button/Card/Input/Tabs/Badge
+     already wear the editorial skin. */
+  --background: 42 31% 94%;        /* #f4f1ea paper  */
+  --foreground: 0 0% 4%;           /* #0a0a0a ink    */
+  --card: 42 31% 94%;
+  --card-foreground: 0 0% 4%;
+  --popover: 42 31% 94%;
+  --popover-foreground: 0 0% 4%;
+  --primary: 0 0% 4%;
+  --primary-foreground: 42 31% 94%;
+  --secondary: 40 20% 89%;
+  --secondary-foreground: 0 0% 16%;
+  --muted: 40 20% 89%;
+  --muted-foreground: 50 4% 40%;   /* #6b6a64 dim    */
+  --accent: 150 59% 30%;           /* #1f7a4d green  */
+  --accent-foreground: 42 31% 94%;
+  --destructive: 9 70% 38%;        /* #a8341d alert  */
+  --destructive-foreground: 42 31% 94%;
+  --border: 0 0% 10%;              /* #1a1a1a rule   */
+  --input: 0 0% 10%;
+  --ring: 0 0% 4%;
+  --radius: 0px;                   /* editorial = no rounding */
+
+  /* ── Base scope styling ──────────────────────────────── */
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-geist-mono), ui-monospace, "JetBrains Mono", monospace;
+  font-size: var(--t-14);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01","cv11","tnum";
+}
+
+.skin-editorial ::selection { background: var(--ink); color: var(--paper); }
+
+/* ── Text utilities ──────────────────────────────────── */
+.skin-editorial .mono    { font-family: var(--font-geist-mono), ui-monospace, monospace; }
+.skin-editorial .sans    { font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.005em; }
+.skin-editorial .serif-it{ font-family: var(--font-instrument), ui-serif, Georgia, serif; font-style: italic; letter-spacing: -0.01em; }
+.skin-editorial .upper   { text-transform: uppercase; letter-spacing: 0.08em; }
+.skin-editorial .tnum    { font-variant-numeric: tabular-nums; }
+.skin-editorial .dim     { color: var(--dim); }
+.skin-editorial .ink     { color: var(--ink); }
+.skin-editorial .accent  { color: var(--ed-accent); }
+.skin-editorial .alert   { color: var(--alert); }
+
+/* ── Kicker / ascii-frame ────────────────────────────── */
+.skin-editorial .kicker {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: var(--t-12);
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.skin-editorial .kicker--accent { color: var(--ed-accent); }
+.skin-editorial .kicker + h1,
+.skin-editorial .kicker + h2,
+.skin-editorial .kicker + h3 { margin-top: 14px; }
+.skin-editorial .kicker-line {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-12);
+}
+.skin-editorial .kicker-line__desc {
+  color: var(--dim); text-transform: none; letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.skin-editorial .ascii-frame {
+  font-family: var(--font-geist-mono), monospace; font-size: 13px; line-height: 1.5;
+  color: var(--ink); white-space: pre; user-select: none; letter-spacing: 0.02em;
+  overflow: hidden; /* decorative rule — clip rather than overflow the viewport */
+}
+.skin-editorial .ascii-frame .dim { color: var(--dim); }
+
+/* ── File-tab id chip ────────────────────────────────── */
+.skin-editorial .file-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 22px; padding: 0 8px;
+  background: var(--ink); color: var(--paper);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: var(--t-12); letter-spacing: 0.04em;
+}
+.skin-editorial .file-tab--ghost { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
+
+/* ── Buttons ─────────────────────────────────────────── */
+.skin-editorial .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 36px; padding: 0 16px;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-13); letter-spacing: 0;
+  border: var(--hair) solid var(--rule); background: var(--paper); color: var(--ink);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  cursor: pointer; user-select: none;
+}
+.skin-editorial .btn:hover { background: var(--ink); color: var(--paper); }
+.skin-editorial .btn:active { transform: translateY(1px); }
+.skin-editorial .btn--primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.skin-editorial .btn--primary:hover { background: var(--ed-accent); border-color: var(--ed-accent); color: var(--paper); }
+.skin-editorial .btn--accent { background: var(--ed-accent); color: var(--paper); border-color: var(--ed-accent); }
+.skin-editorial .btn--accent:hover { background: var(--ed-accent-2); border-color: var(--ed-accent-2); }
+.skin-editorial .btn--ghost { background: transparent; border-color: var(--rule-2); }
+.skin-editorial .btn--ghost:hover { background: var(--paper-2); border-color: var(--rule); color: var(--ink); }
+.skin-editorial .btn--lg { height: 44px; padding: 0 22px; font-size: var(--t-14); }
+.skin-editorial .btn--sm { height: 28px; padding: 0 10px; font-size: var(--t-12); }
+
+/* ── Tag ─────────────────────────────────────────────── */
+.skin-editorial .tag {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 7px;
+  background: var(--paper-2); border: 1px solid var(--rule-2);
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-12);
+  letter-spacing: 0.02em; color: var(--ink-2);
+}
+.skin-editorial .tag--ink    { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.skin-editorial .tag--accent { background: var(--ed-accent); color: var(--paper); border-color: var(--ed-accent); }
+.skin-editorial .tag--alert  { background: var(--alert); color: var(--paper); border-color: var(--alert); }
+
+/* ── Filing-cabinet card ─────────────────────────────── */
+.skin-editorial .filing {
+  position: relative; background: var(--paper);
+  border: var(--hair) solid var(--rule); padding: 24px;
+}
+.skin-editorial .filing__tab {
+  position: absolute; top: -1px; left: 24px; transform: translateY(-100%);
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px;
+  background: var(--ink); color: var(--paper);
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-12); letter-spacing: 0.04em;
+}
+.skin-editorial .filing__tab--ghost {
+  background: var(--paper); color: var(--ink);
+  border: var(--hair) solid var(--rule); border-bottom: 0;
+}
+.skin-editorial .filing__corner {
+  position: absolute; right: 8px; top: 8px;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-12); color: var(--dim);
+}
+.skin-editorial .filing__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-12); color: var(--dim);
+  letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 12px;
+}
+.skin-editorial .filing__title { font-size: var(--t-24); line-height: 1.15; color: var(--ink); margin: 0 0 8px 0; font-weight: 600; }
+.skin-editorial .filing__body { color: var(--ink-2); line-height: 1.6; }
+.skin-editorial .filing--hover { transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+.skin-editorial .filing--hover:hover { transform: translateY(-2px); border-color: var(--ink); }
+
+/* ── Score bar ───────────────────────────────────────── */
+.skin-editorial .score {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-13);
+}
+.skin-editorial .score__label { color: var(--ink); }
+.skin-editorial .score__value { color: var(--ink); font-variant-numeric: tabular-nums; }
+.skin-editorial .score__bar {
+  grid-column: 1 / -1; position: relative; height: 6px;
+  background: repeating-linear-gradient(90deg, var(--rule-2) 0 1px, transparent 1px 6px);
+  border-bottom: 1px solid var(--rule-2);
+}
+.skin-editorial .score__bar-fill {
+  position: absolute; left: 0; top: 0; bottom: -1px; background: var(--ink);
+  transform: scaleX(var(--score, 0.5)); transform-origin: left;
+  transition: transform 1.1s var(--ease); width: 100%;
+}
+.skin-editorial .score__bar--accent .score__bar-fill { background: var(--ed-accent); }
+
+/* ── Status bar (vim/tmux footer) ──────────────────────
+   position:relative (not sticky): the flex-column layout (main flex:1) already
+   seats this at the page bottom. Sticky bottom:0 made it float over the bottom
+   ~28px of every scroll position, covering page content ("sezioni sovrascritte").
+   Same look, no more occlusion. */
+.skin-editorial .statusbar {
+  position: relative; display: flex; align-items: center; gap: 0;
+  background: var(--ink); color: var(--paper);
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-12);
+  padding: 0; height: 28px; border-top: var(--hair) solid var(--rule); z-index: 40;
+}
+.skin-editorial .statusbar__seg {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; height: 100%;
+  border-right: var(--hair) solid rgba(244,241,234,.18);
+}
+.skin-editorial .statusbar__seg--accent { background: var(--ed-accent); }
+.skin-editorial .statusbar__seg--mute { color: rgba(244,241,234,.6); }
+.skin-editorial .statusbar__spacer { flex: 1; }
+.skin-editorial .statusbar__seg--right { border-right: 0; border-left: var(--hair) solid rgba(244,241,234,.18); }
+
+/* ── Caret ───────────────────────────────────────────── */
+.skin-editorial .caret {
+  display: inline-block; width: 0.55em; height: 1em; background: var(--ink);
+  margin-left: 2px; vertical-align: -0.1em; animation: ed-caret-blink 1.1s steps(2) infinite;
+}
+.skin-editorial .caret--accent { background: var(--ed-accent); }
+@keyframes ed-caret-blink { 50% { opacity: 0; } }
+
+/* ── Layout helper for preview ───────────────────────── */
+.skin-editorial .ed-wrap,
+.skin-editorial .wrap {
+  width: 100%; max-width: var(--container); margin: 0 auto;
+  padding-left: var(--pad-x); padding-right: var(--pad-x);
+}
+
+/* ── Top nav (chrome) ────────────────────────────────── */
+.skin-editorial .nav {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--paper); border-bottom: var(--hair) solid var(--rule);
+}
+.skin-editorial .nav__inner {
+  display: flex; align-items: center; gap: var(--s-32); height: 56px;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-13);
+}
+.skin-editorial .nav__brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: -0.01em; }
+.skin-editorial .nav__brand-mark { display: inline-block; width: 8px; height: 8px; background: var(--ink); }
+.skin-editorial .nav__links { display: flex; gap: 24px; margin-left: 32px; }
+.skin-editorial .nav__link { position: relative; padding: 4px 0; color: var(--ink-2); transition: color var(--dur-fast) var(--ease); }
+.skin-editorial .nav__link::after {
+  content: ""; position: absolute; left: 0; right: 100%; bottom: -2px;
+  height: 1px; background: var(--ink); transition: right var(--dur) var(--ease);
+}
+.skin-editorial .nav__link:hover { color: var(--ink); }
+.skin-editorial .nav__link:hover::after,
+.skin-editorial .nav__link.is-active::after { right: 0; }
+.skin-editorial .nav__link.is-active { color: var(--ink); }
+.skin-editorial .nav__spacer { flex: 1; }
+.skin-editorial .nav__actions { display: flex; align-items: center; gap: 8px; }
+.skin-editorial .nav__tail { display: inline-flex; align-items: center; margin-right: 12px; }
+
+/* ── Display headlines ───────────────────────────────── */
+.skin-editorial .h-xl { font-family: var(--font-geist-mono), monospace; font-weight: 700; font-size: clamp(40px, 7.5vw, 104px); line-height: .96; letter-spacing: -0.04em; margin: 0; }
+.skin-editorial .h-lg { font-family: var(--font-geist-mono), monospace; font-weight: 700; font-size: clamp(40px, 7vw, 96px); line-height: .95; letter-spacing: -0.04em; margin: 0; }
+.skin-editorial .h-md { font-family: var(--font-geist-mono), monospace; font-weight: 700; font-size: clamp(36px, 5vw, 72px); line-height: .96; letter-spacing: -0.04em; margin: 0; }
+.skin-editorial .h-sm { font-family: var(--font-geist-mono), monospace; font-weight: 600; font-size: clamp(32px, 4.5vw, 56px); line-height: 1; letter-spacing: -0.025em; margin: 0; }
+.skin-editorial .h-xs { font-family: var(--font-geist-mono), monospace; font-weight: 600; font-size: clamp(28px, 4vw, 48px); line-height: 1; letter-spacing: -0.025em; margin: 0; }
+
+/* ── Section paddings + grids ────────────────────────── */
+.skin-editorial .section { padding: 64px 40px; }
+.skin-editorial .section-lg { padding: 96px 40px; }
+.skin-editorial .section-xl { padding: 128px 40px 64px; }
+.skin-editorial .cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gutter); }
+.skin-editorial .cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gutter); }
+.skin-editorial .cols-12 { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gutter); }
+/* dossier 7/5 split — children min-width:0 so wide mono content wraps/scrolls
+   instead of forcing the track wide (avoids the grid-column:span implicit-track footgun). */
+.skin-editorial .cols-7-5 { display: grid; grid-template-columns: 7fr 5fr; gap: var(--gutter); }
+.skin-editorial .cols-7-5 > * { min-width: 0; }
+@media (max-width: 900px) {
+  .skin-editorial .cols-3, .skin-editorial .cols-2, .skin-editorial .cols-12, .skin-editorial .cols-7-5 { grid-template-columns: 1fr; }
+}
+
+/* landing dossier-preview card — header + 2-col body collapse on mobile
+   (borders live here, not inline, so the media query can swap right→bottom). */
+.skin-editorial .lp-dossier-head { display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; }
+.skin-editorial .lp-dossier-body { display: grid; grid-template-columns: 1fr 1fr; }
+.skin-editorial .lp-dossier-body__main { border-right: 1px solid var(--rule-2); min-width: 0; }
+@media (max-width: 768px) {
+  .skin-editorial .lp-dossier-head { grid-template-columns: auto 1fr; gap: 12px 14px; }
+  .skin-editorial .lp-dossier-head > :last-child { grid-column: 1 / -1; text-align: left; }
+  .skin-editorial .lp-dossier-body { grid-template-columns: 1fr; }
+  .skin-editorial .lp-dossier-body__main { border-right: none; border-bottom: 1px solid var(--rule-2); }
+}
+
+/* ── Issue line / ascii rule / pagenum ───────────────── */
+.skin-editorial .issue-line {
+  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  border-top: 1.5px solid var(--rule); border-bottom: 1.5px solid var(--rule); padding: 14px 0;
+}
+.skin-editorial .issue-line__label { font-family: var(--font-geist-mono), monospace; font-size: var(--t-12); text-transform: uppercase; letter-spacing: 0.2em; color: var(--ink); }
+.skin-editorial .issue-line__meta { font-family: var(--font-geist-mono), monospace; font-size: var(--t-12); color: var(--dim); }
+.skin-editorial .ascii-rule { font-family: var(--font-geist-mono), monospace; font-size: 12px; color: var(--dim); white-space: pre; user-select: none; overflow: hidden; }
+.skin-editorial .pagenum { display: inline-block; font-family: var(--font-instrument), serif; font-style: italic; color: var(--dim); letter-spacing: 0.04em; }
+.skin-editorial .divider-rule { height: var(--hair); background: var(--rule); }
+
+/* ── Marquee ─────────────────────────────────────────── */
+.skin-editorial .marquee {
+  overflow: hidden; border-top: var(--hair) solid var(--rule); border-bottom: var(--hair) solid var(--rule);
+  padding: 12px 0; background: var(--paper-2); position: relative;
+}
+.skin-editorial .marquee__track {
+  display: flex; gap: 48px; animation: ed-marquee 60s linear infinite; white-space: nowrap;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-13); color: var(--ink-2);
+}
+@keyframes ed-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ── Print table ─────────────────────────────────────── */
+.skin-editorial .ptable {
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-13); width: 100%;
+  border-top: var(--rule-w) solid var(--rule); border-bottom: var(--rule-w) solid var(--rule);
+  border-collapse: collapse;
+}
+.skin-editorial .ptable thead th {
+  text-align: left; padding: 14px 12px; border-bottom: var(--hair) solid var(--rule);
+  font-weight: 500; font-size: var(--t-12); text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
+}
+.skin-editorial .ptable tbody td { padding: 14px 12px; border-bottom: var(--hair) dashed var(--rule-2); vertical-align: middle; }
+.skin-editorial .ptable tbody tr:last-child td { border-bottom: 0; }
+.skin-editorial .ptable tbody tr:hover td { background: var(--paper-2); }
+.skin-editorial .ptable th:last-child, .skin-editorial .ptable td:last-child { text-align: right; }
+.skin-editorial .ptable .num { text-align: right; font-variant-numeric: tabular-nums; }
+.skin-editorial .ptable .row-num { color: var(--dim); width: 56px; }
+/* section divider row in a feature matrix (pricing.html); overrides last-child right-align + hover */
+.skin-editorial .ptable__section td {
+  background: var(--paper-2); color: var(--dim); text-align: left;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-12);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.skin-editorial .ptable__section:hover td { background: var(--paper-2); }
+
+/* ── Pricing plan ────────────────────────────────────── */
+.skin-editorial .plan {
+  border: var(--hair) solid var(--rule); padding: 28px 24px; background: var(--paper);
+  display: flex; flex-direction: column; gap: 16px;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.skin-editorial .plan:hover { border-color: var(--ink); }
+.skin-editorial .plan--featured { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.skin-editorial .plan--featured .plan__price-suffix,
+.skin-editorial .plan--featured .kicker { color: rgba(244,241,234,.6); }
+.skin-editorial .plan__head { display: flex; align-items: center; justify-content: space-between; }
+.skin-editorial .plan__name { font-size: var(--t-18); font-weight: 600; }
+.skin-editorial .plan__price { display: flex; align-items: baseline; gap: 6px; }
+.skin-editorial .plan__price-num { font-size: var(--t-48); font-weight: 700; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.skin-editorial .plan__price-suffix { color: var(--dim); font-size: var(--t-13); }
+.skin-editorial .plan__lede { color: var(--dim); font-size: var(--t-16); margin: 0; }
+.skin-editorial .plan--featured .plan__lede { color: rgba(244, 241, 234, 0.72); }
+.skin-editorial .plan__feat ul { display: grid; gap: 8px; font-size: var(--t-13); list-style: none; margin: 0; padding: 0; }
+.skin-editorial .plan__feat li { display: flex; gap: 8px; }
+.skin-editorial .plan__feat li::before { content: "+"; color: var(--ed-accent); }
+.skin-editorial .plan--featured .plan__feat li::before { color: var(--paper); }
+.skin-editorial .plan__pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; height: 22px;
+  background: var(--paper); color: var(--ink); font-size: var(--t-12); letter-spacing: 0.08em; text-transform: uppercase;
+}
+
+/* ── Console (inline mono prompt) ────────────────────── */
+.skin-editorial .console {
+  display: flex; align-items: center; gap: 10px;
+  border: var(--hair) solid var(--rule); padding: 10px 14px; background: var(--paper);
+  font-family: var(--font-geist-mono), monospace;
+}
+.skin-editorial .console__prompt { color: var(--ed-accent); font-weight: 600; }
+.skin-editorial .console__input {
+  flex: 1; min-width: 0; border: 0; outline: 0;
+  font: inherit; color: var(--ink); background: transparent;
+}
+.skin-editorial .console__hint { color: var(--dim); font-size: var(--t-12); white-space: nowrap; }
+
+/* ── Tabs (dossier-style) ── Source: candidate.html / components.css ──
+   .tabs__tab.is-active is scoped under .tabs — distinct from .nav__link.is-active. */
+.skin-editorial .tabs {
+  display: flex; align-items: end; border-bottom: var(--hair) solid var(--rule);
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-13);
+  overflow-x: auto; /* many tabs on a narrow screen scroll, don't overflow the page */
+}
+.skin-editorial .tabs__tab {
+  padding: 12px 16px; border: var(--hair) solid transparent; border-bottom: 0;
+  background: transparent; color: var(--dim); margin-bottom: -1px; white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.skin-editorial .tabs__tab:hover { color: var(--ink); }
+.skin-editorial .tabs__tab.is-active {
+  background: var(--paper); border-color: var(--rule); border-bottom-color: var(--paper); color: var(--ink);
+}
+
+/* ── Commit heatmap (ASCII-viz family) ── Source: candidate.html ──
+   white-space:pre + overflow-x:auto → wide grid scrolls inside, never overflows the viewport. */
+.skin-editorial .commit-heatmap {
+  font-family: var(--font-geist-mono), monospace; font-size: 12px; line-height: 1.4;
+  color: var(--ink-2); white-space: pre; overflow-x: auto;
+}
+.skin-editorial .commit-heatmap__legend {
+  display: flex; align-items: center; gap: 12px; padding-top: 16px; flex-wrap: wrap;
+  font-family: var(--font-geist-mono), monospace; font-size: 12px; color: var(--dim);
+}
+
+/* ── Outreach log (syslog timeline) ── Source: candidate.html ──
+   the mockup's bespoke hex syslog colors mapped to the mono-tonal token palette. */
+.skin-editorial .outreach-log {
+  background: var(--ink); color: rgba(244, 241, 234, 0.82);
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-13); line-height: 1.8;
+  padding: 24px; margin: 0; overflow-x: auto;
+}
+.skin-editorial .outreach-log .ts { color: rgba(244, 241, 234, 0.5); }  /* timestamp */
+.skin-editorial .outreach-log .em { color: var(--paper); }              /* emphasized: who / template */
+.skin-editorial .outreach-log .ok { color: var(--ed-accent); }             /* status: delivered / opened */
+.skin-editorial .outreach-log__actions {
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px; flex-wrap: wrap;
+  background: var(--paper-2); border-top: var(--hair) solid var(--rule);
+}
+
+/* ── Form fields (underline-only) ── Source: signup.html / components.css ── */
+.skin-editorial .field { display: grid; gap: 6px; }
+.skin-editorial .field__label {
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-12);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
+}
+.skin-editorial .field__input,
+.skin-editorial .field__textarea,
+.skin-editorial .field__select {
+  width: 100%; padding: 8px 0; border: 0;
+  border-bottom: var(--hair) solid var(--rule); background: transparent;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-15); color: var(--ink);
+}
+.skin-editorial .field__input:focus,
+.skin-editorial .field__textarea:focus,
+.skin-editorial .field__select:focus { border-bottom-color: var(--ed-accent); outline: 0; }
+.skin-editorial .field__textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
+.skin-editorial .field__hint { font-size: var(--t-12); color: var(--dim); }
+
+/* ── Fancy divider ("— oppure —") ── */
+.skin-editorial .divider-fancy {
+  text-align: center; color: var(--dim); font-family: var(--font-geist-mono), monospace;
+  font-size: var(--t-12); letter-spacing: 0.6em; padding: 24px 0;
+}
+
+/* ── Split layout (form 60% · sidecar 40%) ── Source: signup.html ──
+   Horizontal padding flows through --pad-x so it shrinks on mobile (no hardcoded inset). */
+.skin-editorial .split { display: grid; grid-template-columns: 1.5fr 1fr; min-height: calc(100vh - 56px); }
+.skin-editorial .split__main {
+  min-width: 0; /* let the column shrink below content min-content (ascii-frame is white-space:pre) */
+  padding: 64px var(--pad-x) 96px; border-right: var(--hair) solid var(--rule);
+  display: flex; flex-direction: column;
+}
+
+/* ── Aside: shared base + two named variants ──────────────────────────
+   The mockup reused `.aside` for two different things — signup's right sidecar
+   AND dashboard's left filter sidebar — a Connascence-of-Name collision (one name,
+   two meanings). We split it: `--sidecar` (signup) vs `--rail` (dashboard).
+   The <Aside> component defaults to `sidecar`, so signup is unchanged. */
+/* Auth pages: short forms → vertically center each column's content so the tall
+   full-height columns (divider intact) don't leave a big void below a short form. */
+.skin-editorial .split--auth .split__main,
+.skin-editorial .split--auth .aside--sidecar { justify-content: center; }
+
+.skin-editorial .aside { min-width: 0; }
+.skin-editorial .aside--sidecar {
+  background: var(--paper-2); padding: 64px var(--pad-x) 96px;
+  display: flex; flex-direction: column; gap: 40px;
+}
+@media (max-width: 768px) {
+  .skin-editorial .split { grid-template-columns: 1fr; min-height: 0; }
+  .skin-editorial .split__main { border-right: 0; }
+  .skin-editorial .aside--sidecar { border-top: var(--hair) solid var(--rule); }
+}
+
+/* ── Dashboard app layout (filter sidebar rail + main) ── Source: dashboard.html ── */
+.skin-editorial .app { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 56px); }
+.skin-editorial .aside--rail {
+  border-right: var(--hair) solid var(--rule); padding: 24px 20px 96px;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-13); background: var(--paper);
+}
+.skin-editorial .aside__title {
+  font-size: var(--t-12); color: var(--dim);
+  text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 8px;
+}
+.skin-editorial .aside__title:first-child { margin-top: 0; }
+.skin-editorial .aside__item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 8px; color: var(--ink-2); cursor: pointer;
+}
+.skin-editorial .aside__item:hover { background: var(--paper-2); color: var(--ink); }
+.skin-editorial .aside__item.is-active { background: var(--ink); color: var(--paper); }
+.skin-editorial .aside__count { color: var(--dim); font-size: var(--t-12); font-variant-numeric: tabular-nums; }
+.skin-editorial .aside__item.is-active .aside__count { color: rgba(244, 241, 234, .6); }
+.skin-editorial .main { padding: 32px var(--pad-x) 48px; min-width: 0; }
+@media (max-width: 1024px) {
+  .skin-editorial .app { grid-template-columns: 1fr; }
+  .skin-editorial .aside--rail { display: none; }
+  .skin-editorial .main { padding: 24px; }
+}
+
+/* ── Match shortlist row ── Source: match.html ──
+   Layout in CSS (not inline) so the rigid confidence column can collapse on
+   mobile: @375 the fixed 200px conf column + filing padding overflowed the row. */
+.skin-editorial .match-result {
+  padding: 18px 24px; display: grid; grid-template-columns: 40px 1fr auto auto;
+  gap: 20px; align-items: center; text-decoration: none;
+}
+.skin-editorial .match-result__body { min-width: 0; }
+.skin-editorial .match-result__conf { display: grid; gap: 4px; min-width: 200px; }
+@media (max-width: 768px) {
+  .skin-editorial .match-result { grid-template-columns: 28px 1fr auto; gap: 10px 12px; }
+  .skin-editorial .match-result__conf { grid-column: 1 / -1; min-width: 0; }
+}
+
+/* ── Kanban board ── Source: pipeline.html ──
+   kcard__score uses --ed-accent (NOT shadcn's --accent HSL triplet). Stacks @768. */
+.skin-editorial .kanban { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 16px; align-items: start; }
+.skin-editorial .kcol { border: var(--hair) solid var(--rule); background: var(--paper); min-height: 60vh; }
+.skin-editorial .kcol__head {
+  display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;
+  border-bottom: var(--hair) solid var(--rule); font-family: var(--font-geist-mono), monospace;
+  font-size: var(--t-12); text-transform: uppercase; letter-spacing: 0.08em; background: var(--paper-2);
+}
+.skin-editorial .kcol__count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 20px; padding: 0 7px; background: var(--ink); color: var(--paper);
+  font-size: var(--t-12); letter-spacing: 0.04em; font-variant-numeric: tabular-nums;
+}
+.skin-editorial .kcol__body { padding: 12px; display: grid; gap: 10px; }
+.skin-editorial .kcard {
+  position: relative; border: var(--hair) solid var(--rule-2); padding: 10px 12px 10px 22px;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-12); background: var(--paper);
+  transition: border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+  cursor: grab; text-decoration: none; display: block;
+}
+.skin-editorial .kcard::before {
+  content: "⋮⋮"; position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
+  color: var(--rule-2); font-size: var(--t-12); letter-spacing: -1px; line-height: 1;
+  transition: color var(--dur-fast) var(--ease);
+}
+.skin-editorial .kcard:hover { border-color: var(--ink); transform: translateY(-1px); background: var(--paper-2); }
+.skin-editorial .kcard:hover::before { color: var(--ink); }
+.skin-editorial .kcard:active { cursor: grabbing; }
+.skin-editorial .kcard__id { color: var(--dim); }
+.skin-editorial .kcard__name { color: var(--ink); font-size: var(--t-13); margin: 4px 0 2px; }
+.skin-editorial .kcard__meta { color: var(--dim); display: flex; gap: 8px; flex-wrap: wrap; }
+.skin-editorial .kcard__score { color: var(--ed-accent); font-variant-numeric: tabular-nums; }
+@media (max-width: 768px) { .skin-editorial .kanban { grid-template-columns: 1fr; } }
+
+/* ── Stepper ── Source: onboarding.html ──
+   is-done num uses --ed-accent (NOT shadcn's --accent triplet). Scrolls @768. */
+.skin-editorial .stepper { display: flex; align-items: center; gap: 0; font-family: var(--font-geist-mono), monospace; font-size: var(--t-13); }
+.skin-editorial .stepper__step { display: inline-flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--dim); white-space: nowrap; }
+.skin-editorial .stepper__num {
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+  border: var(--hair) solid var(--rule-2); font-size: var(--t-12); font-variant-numeric: tabular-nums;
+}
+.skin-editorial .stepper__step.is-done .stepper__num { background: var(--ed-accent); color: var(--paper); border-color: var(--ed-accent); }
+.skin-editorial .stepper__step.is-active { color: var(--ink); }
+.skin-editorial .stepper__step.is-active .stepper__num { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.skin-editorial .stepper__sep { flex: 0 0 48px; height: 1px; background: var(--rule-2); margin: 0 12px; }
+@media (max-width: 768px) {
+  .skin-editorial .stepper { overflow-x: auto; }
+  .skin-editorial .stepper__sep { flex-basis: 24px; margin: 0 8px; }
+}
+
+/* ── ASCII-viz helpers + insights layout ── Source: insights.html ── */
+.skin-editorial .text-bar { font-family: var(--font-geist-mono), monospace; letter-spacing: -0.04em; white-space: pre; }
+.skin-editorial .spark { font-family: var(--font-geist-mono), monospace; letter-spacing: 0.08em; white-space: pre; }
+.skin-editorial .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.skin-editorial .funnel-row { display: grid; grid-template-columns: 220px 1fr 80px; gap: 24px; align-items: center; }
+@media (max-width: 900px) { .skin-editorial .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) {
+  /* funnel collapses: label + value on one row, the bar spans full width below (clipped) */
+  .skin-editorial .funnel-row { grid-template-columns: 1fr auto; gap: 6px 12px; }
+  .skin-editorial .funnel-row .text-bar { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) { .skin-editorial .kpi-grid { grid-template-columns: 1fr; } }
+
+/* ── Settings layout ── Source: settings.html ── responsive collapses ── */
+.skin-editorial .settings-layout { display: grid; grid-template-columns: 220px 1fr; gap: 48px; align-items: start; }
+/* min-width:0 lets the 1fr column shrink below its tables' min-content (which scroll
+   inside their overflow wrapper) instead of blowing the whole grid wide — grid footgun. */
+.skin-editorial .settings-layout > * { min-width: 0; }
+/* the sections column is itself a grid; its filings must also shrink so their wide
+   tables scroll inside the overflow wrapper instead of widening the whole page. */
+.skin-editorial .settings-sections { display: grid; gap: 64px; min-width: 0; }
+.skin-editorial .settings-sections > * { min-width: 0; }
+.skin-editorial .settings-billing { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+.skin-editorial .settings-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 16px; align-items: center; padding: 16px; }
+.skin-editorial .settings-drow { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding: 16px; align-items: center; }
+/* sticky section nav — opaque (paper bg + z-index) so full-width content above the grid
+   never bleeds through the transparent sticky as it scrolls past it. Below nav (z-50). */
+.skin-editorial .settings-nav {
+  position: sticky; top: 72px; align-self: start; z-index: 30;
+  background: var(--paper); padding-bottom: 16px;
+}
+@media (max-width: 900px) {
+  .skin-editorial .settings-layout { grid-template-columns: 1fr; gap: 24px; }
+  /* single-column: don't stick over the content scrolling beneath it */
+  .skin-editorial .settings-nav { position: static; }
+}
+@media (max-width: 768px) { .skin-editorial .settings-billing { grid-template-columns: 1fr; } }
+@media (max-width: 560px) {
+  .skin-editorial .settings-row { grid-template-columns: 40px 1fr; }
+  .skin-editorial .settings-row > .btn, .skin-editorial .settings-row > .tag { grid-column: 2; justify-self: start; }
+  .skin-editorial .settings-drow { grid-template-columns: 1fr; }
+}
+
+/* ── Footer ──────────────────────────────────────────── */
+.skin-editorial .foot {
+  /* padding-top/bottom only — horizontal padding comes from .wrap (--pad-x).
+     A `padding: 64px 0 32px` shorthand would zero out .wrap's left/right (same
+     specificity, later in source) → footer glued to the left edge. */
+  border-top: var(--hair) solid var(--rule); padding-top: 64px; padding-bottom: 32px; margin-top: 96px;
+  font-family: var(--font-geist-mono), monospace; font-size: var(--t-13); color: var(--ink-2);
+}
+.skin-editorial .foot a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+.skin-editorial .foot__cols { display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); gap: 32px; margin-bottom: 48px; }
+.skin-editorial .foot__col-title { font-size: var(--t-12); text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); margin-bottom: 14px; }
+.skin-editorial .foot__col ul { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.skin-editorial .foot__bottom {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px;
+  border-top: var(--hair) solid var(--rule-2); padding-top: 20px; color: var(--dim); font-size: var(--t-12);
+}
+@media (max-width: 768px) { .skin-editorial .foot__cols { grid-template-columns: 1fr 1fr; } }
+
+/* ── FAQ line-nums ───────────────────────────────────── */
+.skin-editorial .line-nums { position: relative; padding-left: 56px; }
+.skin-editorial .line-nums::before {
+  content: attr(data-lines); position: absolute; left: 0; top: 0; width: 44px; text-align: right;
+  color: var(--dim); font-family: var(--font-geist-mono), monospace; font-size: var(--t-12);
+  line-height: inherit; white-space: pre; font-variant-numeric: tabular-nums;
+}
+
+/* reveal: render visible (no scroll-JS in the server-rendered preview) */
+.skin-editorial .reveal { opacity: 1; transform: none; }
+
+/* ── Editorial app shell (dashboard chrome) — EditorialShell.tsx ── */
+.skin-editorial.ed-shell { min-height: 100vh; background: var(--paper); }
+.skin-editorial .nav__userbtn { display: inline-flex; align-items: center; } /* stays visible on mobile (unlike .nav__tail) */
+.skin-editorial .ed-shell__main { min-width: 0; } /* no padding — each page owns its .wrap + padding */
+.skin-editorial .ed-mobtab { display: none; }
+@media (max-width: 768px) {
+  .skin-editorial .ed-shell__main { padding-bottom: 64px; } /* extra clearance above the fixed bottom-tab */
+  .skin-editorial .ed-mobtab { display: block; position: fixed; bottom: 0; left: 0; right: 0; z-index: 45; }
+  .skin-editorial .ed-mobtab__bar {
+    display: flex; background: var(--paper); border-top: var(--hair) solid var(--rule);
+    font-family: var(--font-geist-mono), monospace; font-size: var(--t-12);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .skin-editorial .ed-mobtab__tab {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 12px 4px; color: var(--dim); letter-spacing: 0.02em;
+    background: none; border: none; cursor: pointer; text-align: center;
+  }
+  .skin-editorial .ed-mobtab__tab.is-active { color: var(--ink); font-weight: 600; box-shadow: inset 0 2px 0 var(--ink); }
+  .skin-editorial .ed-mobtab__more { background: var(--paper); border-top: var(--hair) solid var(--rule); }
+  .skin-editorial .ed-mobtab__moreitem {
+    display: block; padding: 12px 24px; color: var(--dim);
+    font-family: var(--font-geist-mono), monospace; font-size: var(--t-13);
+    border-bottom: var(--hair) solid var(--rule-2);
+  }
+  .skin-editorial .ed-mobtab__moreitem.is-active { color: var(--ink); font-weight: 600; }
+}
+
+@media (max-width: 768px) {
+  .skin-editorial { --pad-x: 20px; }
+  .skin-editorial .section, .skin-editorial .section-lg, .skin-editorial .section-xl { padding-left: 20px; padding-right: 20px; }
+  .skin-editorial .h-xl { font-size: clamp(26px, 8vw, 56px); }
+  /* nav collapses: links + file-tab tail hide (secondary), brand + actions stay on one row */
+  .skin-editorial .nav__links { display: none; }
+  .skin-editorial .nav__tail { display: none; }
+  .skin-editorial .nav__inner { gap: 12px; }
+  .skin-editorial .nav__actions { gap: 6px; }
+  /* wide print tables keep their layout and scroll horizontally inside the wrapper */
+  .skin-editorial .ptable--cmp { min-width: 540px; }
+  /* dossier skeleton: tighten padding + collapse the 3-col header to a stack */
+  .skin-editorial .ed-main { padding-left: 20px !important; padding-right: 20px !important; }
+  .skin-editorial .ed-dossier-head { grid-template-columns: 1fr !important; }
+  /* status bar collapses to one line: drop the non-load-bearing mute segments */
+  .skin-editorial .statusbar__seg--mute { display: none; }
+}
+
+/* ── Legal pages body (privacy / terms / gdpr) ── */
+.skin-editorial .legal-prose {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--ink-2); font-size: 14px; line-height: 1.7;
+}
+.skin-editorial .legal-prose section { margin-bottom: 32px; scroll-margin-top: 80px; }
+.skin-editorial .legal-prose h2 {
+  color: var(--ink); font-size: 17px; font-weight: 700;
+  margin: 0 0 12px; letter-spacing: -0.01em;
+}
+.skin-editorial .legal-prose h3 { color: var(--ink); font-size: 14px; font-weight: 700; margin: 20px 0 8px; }
+.skin-editorial .legal-prose p { margin: 0 0 12px; }
+.skin-editorial .legal-prose ul, .skin-editorial .legal-prose ol { margin: 0 0 12px; padding-left: 22px; }
+.skin-editorial .legal-prose li { margin-bottom: 6px; }
+.skin-editorial .legal-prose strong { color: var(--ink); font-weight: 700; }
+.skin-editorial .legal-prose a { color: var(--ed-accent); text-decoration: underline; text-underline-offset: 3px; }
+.skin-editorial .legal-prose hr { border: 0; border-top: 1px solid var(--rule-2); margin: 24px 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-editorial .caret { animation: none; }
+  .skin-editorial .score__bar-fill { transition: none; }
+}

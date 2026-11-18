@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["login", "normalizedScore", "rankingMethod"],
+    "properties": {
+      "login": {"type": "string"},
+      "normalizedScore": {"type": "number"},
+      "rankComment": {"type": ["string", "null"]},
+      "rankingMethod": {"type": "string", "enum": ["deterministic", "ai_cluster", "ai_forced", "ai_cluster_fallback"]}
+    }
+  }
+}

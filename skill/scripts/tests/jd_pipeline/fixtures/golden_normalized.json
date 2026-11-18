@@ -1,0 +1,26 @@
+[
+  {
+    "login": "alice-fullstack",
+    "normalizedScore": 82.4,
+    "rankComment": null,
+    "rankingMethod": "deterministic"
+  },
+  {
+    "login": "dave-devops",
+    "normalizedScore": 50.5,
+    "rankComment": "Stronger architecture and documentation than bob-backend, with production-ready Terraform modules",
+    "rankingMethod": "ai_cluster"
+  },
+  {
+    "login": "bob-backend",
+    "normalizedScore": 35.0,
+    "rankComment": "Solid Spring Boot patterns but less architectural sophistication than dave-devops",
+    "rankingMethod": "ai_cluster"
+  },
+  {
+    "login": "carol-junior",
+    "normalizedScore": 14.8,
+    "rankComment": null,
+    "rankingMethod": "deterministic"
+  }
+]

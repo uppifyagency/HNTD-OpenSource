@@ -1,0 +1,44 @@
+{
+  "rankings": [
+    {
+      "login": "alice-fullstack",
+      "deterministicRank": 82.4,
+      "languageFitScore": 92.2,
+      "collaborationScore": 82.0,
+      "projectMaturityScore": 55.8,
+      "codeQualityScore": 82,
+      "prefilterBoostNormalized": 53.6,
+      "forcedAI": false
+    },
+    {
+      "login": "dave-devops",
+      "deterministicRank": 48.1,
+      "languageFitScore": 6.7,
+      "collaborationScore": 68.5,
+      "projectMaturityScore": 52.3,
+      "codeQualityScore": 40,
+      "prefilterBoostNormalized": 39.3,
+      "forcedAI": false
+    },
+    {
+      "login": "bob-backend",
+      "deterministicRank": 37.2,
+      "languageFitScore": 5.4,
+      "collaborationScore": 51.2,
+      "projectMaturityScore": 28.5,
+      "codeQualityScore": 35,
+      "prefilterBoostNormalized": 8.9,
+      "forcedAI": false
+    },
+    {
+      "login": "carol-junior",
+      "deterministicRank": 14.8,
+      "languageFitScore": 5.6,
+      "collaborationScore": 7.0,
+      "projectMaturityScore": 5.4,
+      "codeQualityScore": 18,
+      "prefilterBoostNormalized": 0.0,
+      "forcedAI": false
+    }
+  ]
+}

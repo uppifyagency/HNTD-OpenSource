@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["login", "githubId", "profileUrl", "followers", "publicRepos", "topLanguages", "topRepos"],
+  "properties": {
+    "login": {"type": "string"},
+    "githubId": {"type": ["integer", "string"]},
+    "name": {"type": ["string", "null"]},
+    "email": {"type": ["string", "null"]},
+    "location": {"type": ["string", "null"]},
+    "bio": {"type": ["string", "null"]},
+    "blog": {"type": ["string", "null"]},
+    "followers": {"type": "integer", "minimum": 0},
+    "publicRepos": {"type": "integer", "minimum": 0},
+    "profileUrl": {"type": "string", "pattern": "^https://github.com/"},
+    "topLanguages": {"type": "array", "items": {"type": "string"}},
+    "topRepos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "url"],
+        "properties": {
+          "name": {"type": "string"},
+          "fullName": {"type": "string"},
+          "url": {"type": "string"},
+          "language": {"type": ["string", "null"]},
+          "languages": {"type": "object"},
+          "stars": {"type": "integer"},
+          "forks": {"type": "integer"},
+          "description": {"type": ["string", "null"]},
+          "directoryListing": {"type": "array", "items": {"type": "string"}},
+          "sourceFiles": {"type": "array", "items": {"type": "object", "required": ["path", "content"]}},
+          "commits": {"type": "array", "items": {"type": "object", "required": ["sha", "message", "date"]}}
+        }
+      }
+    }
+  }
+}

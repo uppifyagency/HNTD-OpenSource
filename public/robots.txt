@@ -1,0 +1,11 @@
+# HNTD Intel — Recruiting intelligence per team tecnici
+# https://hntd.it
+
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /sign-in
+Disallow: /sign-up
+Disallow: /api/
+
+Sitemap: https://hntd.it/sitemap.xml

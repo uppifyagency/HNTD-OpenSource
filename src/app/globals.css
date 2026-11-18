@@ -1,0 +1,265 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* Editorial skin (additive, scoped under .skin-editorial) */
+@import "./editorial.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  /* V4 extended semantic tokens */
+  --color-ok: hsl(var(--ok));
+  --color-warn: hsl(var(--warn));
+  --color-err: hsl(var(--err));
+  --color-light: hsl(var(--light));
+  --color-faint: hsl(var(--faint));
+  /* HNTD Green scale — kept for chart/landing, no longer primary */
+  --color-hntd-green-50: hsl(var(--hntd-green-50));
+  --color-hntd-green-100: hsl(var(--hntd-green-100));
+  --color-hntd-green-200: hsl(var(--hntd-green-200));
+  --color-hntd-green-300: hsl(var(--hntd-green-300));
+  --color-hntd-green-400: hsl(var(--hntd-green-400));
+  --color-hntd-green-500: hsl(var(--hntd-green-500));
+  --color-hntd-green-600: hsl(var(--hntd-green-600));
+  --color-hntd-green-700: hsl(var(--hntd-green-700));
+  --color-hntd-green-800: hsl(var(--hntd-green-800));
+  --color-hntd-green-900: hsl(var(--hntd-green-900));
+  /* HNTD Gray scale — fallback */
+  --color-hntd-gray-50: hsl(var(--hntd-gray-50));
+  --color-hntd-gray-100: hsl(var(--hntd-gray-100));
+  --color-hntd-gray-200: hsl(var(--hntd-gray-200));
+  --color-hntd-gray-300: hsl(var(--hntd-gray-300));
+  --color-hntd-gray-400: hsl(var(--hntd-gray-400));
+  --color-hntd-gray-500: hsl(var(--hntd-gray-500));
+  --color-hntd-gray-600: hsl(var(--hntd-gray-600));
+  --color-hntd-gray-700: hsl(var(--hntd-gray-700));
+  --color-hntd-gray-800: hsl(var(--hntd-gray-800));
+  --color-hntd-gray-900: hsl(var(--hntd-gray-900));
+  /* Score semantic colors */
+  --color-score-amber: hsl(var(--score-amber));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+}
+
+:root {
+  /* V4 Mono Puro — zero saturation, pure grays */
+  --radius: 0.5rem;
+  --background: 0 0% 93%;
+  --foreground: 0 0% 7%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 7%;
+  --primary: 0 0% 7%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 95%;
+  --secondary-foreground: 0 0% 20%;
+  --muted: 0 0% 95%;
+  --muted-foreground: 0 0% 47%;
+  --accent: 0 0% 95%;
+  --accent-foreground: 0 0% 7%;
+  --destructive: 0 72% 46%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 88%;
+  --input: 0 0% 88%;
+  --ring: 0 0% 7%;
+  --chart-1: 142 64% 36%;
+  --chart-2: 142 64% 30%;
+  --chart-3: 142 64% 24%;
+  --chart-4: 142 64% 18%;
+  --chart-5: 142 64% 12%;
+
+  /* V4 Extended tokens */
+  --light: 0 0% 67%;
+  --faint: 0 0% 87%;
+  --rule: 0 0% 88%;
+  --surface: 0 0% 97%;
+  --ok: 145 58% 39%;
+  --warn: 42 88% 40%;
+  --err: 4 63% 46%;
+
+  /* Sidebar — uses surface palette */
+  --sidebar: 0 0% 93%;
+  --sidebar-foreground: 0 0% 7%;
+  --sidebar-primary: 0 0% 7%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 95%;
+  --sidebar-accent-foreground: 0 0% 7%;
+  --sidebar-border: 0 0% 88%;
+  --sidebar-ring: 0 0% 7%;
+
+  /* HNTD Green scale — kept for chart colors and landing page, NOT primary */
+  --hntd-green-50: 138 40% 96%;
+  --hntd-green-100: 140 40% 90%;
+  --hntd-green-200: 140 40% 80%;
+  --hntd-green-300: 142 40% 65%;
+  --hntd-green-400: 142 50% 48%;
+  --hntd-green-500: 142 64% 36%;
+  --hntd-green-600: 144 70% 28%;
+  --hntd-green-700: 146 72% 22%;
+  --hntd-green-800: 148 70% 16%;
+  --hntd-green-900: 150 65% 10%;
+
+  /* HNTD Gray scale — fallback */
+  --hntd-gray-50: 0 0% 97%;
+  --hntd-gray-100: 0 0% 94%;
+  --hntd-gray-200: 0 0% 88%;
+  --hntd-gray-300: 0 0% 72%;
+  --hntd-gray-400: 0 0% 52%;
+  --hntd-gray-500: 0 0% 38%;
+  --hntd-gray-600: 0 0% 28%;
+  --hntd-gray-700: 0 0% 20%;
+  --hntd-gray-800: 0 0% 14%;
+  --hntd-gray-900: 0 0% 8%;
+
+  /* Score semantic colors — aligned to V4 */
+  --score-amber: 42 88% 40%;
+  --warning: 42 88% 40%;
+  --warning-foreground: 42 80% 20%;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.15);
+  }
+}
+
+/* Section label — monospace uppercase tag */
+.section-label {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-family: var(--font-mono);
+  color: hsl(var(--light));
+}
+
+/* Section title — extrabold, tight tracking */
+.section-title {
+  font-weight: 800;
+  color: hsl(var(--foreground));
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+/* Gradient text — monochrome gradient */
+.text-gradient-primary {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--foreground)),
+    hsl(var(--muted-foreground))
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Card hover — subtle lift, no color glow */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 20px 40px -12px hsl(var(--foreground) / 0.08),
+    0 8px 20px -8px hsl(var(--foreground) / 0.04);
+}
+
+/* GitHub contribution grid cell */
+.contrib-cell {
+  border-radius: 2px;
+  transition: opacity 0.4s ease;
+}
+
+/* Contribution grid fade mask */
+.contrib-grid-mask {
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 80% at 50% 50%,
+    black 30%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 70% 80% at 50% 50%,
+    black 30%,
+    transparent 100%
+  );
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--light));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Typing cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Landing page hover states */
+.lp-btn-dark:hover { opacity: 0.85; }
+.lp-btn-ghost:hover { border-color: #ccc !important; }

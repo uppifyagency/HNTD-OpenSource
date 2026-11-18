@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["clusterId", "rankings"],
+  "properties": {
+    "clusterId": {"type": "integer", "minimum": 0},
+    "rankings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["login", "normalizedScore", "rankComment"],
+        "properties": {
+          "login": {"type": "string"},
+          "normalizedScore": {"type": "number"},
+          "rankComment": {"type": "string", "minLength": 5}
+        },
+        "additionalProperties": false
+      },
+      "minItems": 2
+    }
+  },
+  "additionalProperties": false
+}

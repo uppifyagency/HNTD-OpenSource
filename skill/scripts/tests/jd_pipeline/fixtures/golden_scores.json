@@ -1,0 +1,60 @@
+{
+  "scores": [
+    {
+      "login": "alice-fullstack",
+      "score": 82,
+      "objectiveScore": 78,
+      "niceToHaveBonus": 6,
+      "scoreBreakdown": {"codeQuality": 16, "architecture": 17, "testing": 13, "documentation": 12, "complexity": 11, "consistency": 9},
+      "jdScoreBreakdown": {"Frontend Mastery": 22, "Backend Proficiency": 20, "Full-Stack Integration": 16, "Code Quality & Testing": 13, "Architecture & Scalability": 11},
+      "scoreComment": "Strong React and Node.js codebase with TypeScript. Clean component architecture with custom hooks. Tests present but could be more comprehensive.",
+      "jdAssessment": "Excellent full-stack match. React dashboard demonstrates advanced patterns (hooks, state management). Node.js API shows clean Express architecture. Both must-haves satisfied.",
+      "matchConfidence": 88,
+      "matchReason": "Strong React + Node.js developer with TypeScript, matching all must-haves and most nice-to-haves",
+      "scoreModel": "claude-haiku-4-5",
+      "topRepo": "react-dashboard"
+    },
+    {
+      "login": "bob-backend",
+      "score": 35,
+      "objectiveScore": 62,
+      "niceToHaveBonus": 0,
+      "scoreBreakdown": {"codeQuality": 13, "architecture": 14, "testing": 8, "documentation": 10, "complexity": 10, "consistency": 7},
+      "jdScoreBreakdown": {"Frontend Mastery": 2, "Backend Proficiency": 18, "Full-Stack Integration": 3, "Code Quality & Testing": 7, "Architecture & Scalability": 5},
+      "scoreComment": "Solid Java backend with Spring Boot patterns. Clean project structure. Limited testing and documentation.",
+      "jdAssessment": "Backend-only developer. No React/Vue evidence (must-have miss). Strong Spring Boot but no Node.js. Does not match the full-stack requirement.",
+      "matchConfidence": 28,
+      "matchReason": "Java backend specialist, missing frontend must-haves entirely",
+      "scoreModel": "claude-haiku-4-5",
+      "topRepo": "spring-microservice"
+    },
+    {
+      "login": "carol-junior",
+      "score": 18,
+      "objectiveScore": 22,
+      "niceToHaveBonus": 0,
+      "scoreBreakdown": {"codeQuality": 5, "architecture": 3, "testing": 2, "documentation": 4, "complexity": 4, "consistency": 4},
+      "jdScoreBreakdown": {"Frontend Mastery": 1, "Backend Proficiency": 5, "Full-Stack Integration": 1, "Code Quality & Testing": 3, "Architecture & Scalability": 2},
+      "scoreComment": "Beginner-level Flask app with minimal structure. No tests, basic documentation. Single simple project.",
+      "jdAssessment": "Junior developer with no React/Vue or Node.js experience. Single Flask project is too simple for senior role. Both must-haves missing.",
+      "matchConfidence": 8,
+      "matchReason": "Junior Python developer, no match for senior full-stack React/Node role",
+      "scoreModel": "claude-haiku-4-5",
+      "topRepo": "flask-todo"
+    },
+    {
+      "login": "dave-devops",
+      "score": 40,
+      "objectiveScore": 71,
+      "niceToHaveBonus": 4,
+      "scoreBreakdown": {"codeQuality": 15, "architecture": 16, "testing": 9, "documentation": 12, "complexity": 12, "consistency": 7},
+      "jdScoreBreakdown": {"Frontend Mastery": 1, "Backend Proficiency": 8, "Full-Stack Integration": 5, "Code Quality & Testing": 11, "Architecture & Scalability": 15},
+      "scoreComment": "Excellent infrastructure code with Terraform and Go. Production-ready modules with documentation. Strong architectural patterns.",
+      "jdAssessment": "DevOps engineer, not a full-stack developer. No React/Vue (must-have miss). Go CLI is backend-adjacent but not Node.js. Docker and CI/CD nice-to-haves present.",
+      "matchConfidence": 32,
+      "matchReason": "DevOps specialist with Docker/CI expertise but missing frontend must-haves",
+      "scoreModel": "claude-haiku-4-5",
+      "topRepo": "terraform-aws"
+    }
+  ]
+}

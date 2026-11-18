@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["login", "score", "scoreBreakdown", "scoreComment", "scoreModel"],
+  "properties": {
+    "login": {"type": "string"},
+    "score": {"type": "number", "minimum": 0, "maximum": 110},
+    "objectiveScore": {"type": "number", "minimum": 0, "maximum": 100},
+    "niceToHaveBonus": {"type": "number", "minimum": 0, "maximum": 10},
+    "scoreBreakdown": {
+      "type": "object",
+      "required": ["codeQuality", "architecture", "testing", "documentation", "complexity", "consistency"],
+      "properties": {
+        "codeQuality": {"type": "number", "minimum": 0, "maximum": 20},
+        "architecture": {"type": "number", "minimum": 0, "maximum": 20},
+        "testing": {"type": "number", "minimum": 0, "maximum": 15},
+        "documentation": {"type": "number", "minimum": 0, "maximum": 15},
+        "complexity": {"type": "number", "minimum": 0, "maximum": 15},
+        "consistency": {"type": "number", "minimum": 0, "maximum": 15}
+      },
+      "additionalProperties": false
+    },
+    "jdScoreBreakdown": {"type": "object"},
+    "scoreComment": {"type": "string", "minLength": 10},
+    "jdAssessment": {"type": "string"},
+    "matchConfidence": {"type": "number", "minimum": 0, "maximum": 100},
+    "matchReason": {"type": "string"},
+    "scoreModel": {"type": "string"},
+    "topRepo": {"type": "string"}
+  }
+}

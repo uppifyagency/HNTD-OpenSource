@@ -1,0 +1,30 @@
+{
+  "extractedParams": {
+    "languages": ["JavaScript", "TypeScript"],
+    "locations": ["Milan", "Milano", "Italy"],
+    "keywords": ["React", "Node.js", "full-stack"],
+    "senioritySignals": ["senior", "5+ years", "lead"],
+    "roleType": "fullstack"
+  },
+  "scoringRubric": {
+    "dimensions": [
+      {"name": "Frontend Mastery", "weight": 25, "description": "React/Vue component architecture, state management, modern patterns", "signals": ["React", "Vue", "Redux", "hooks"]},
+      {"name": "Backend Proficiency", "weight": 25, "description": "Node.js/Express API design, database integration, REST/GraphQL", "signals": ["Node.js", "Express", "API", "REST"]},
+      {"name": "Full-Stack Integration", "weight": 20, "description": "End-to-end feature delivery, frontend-backend coordination", "signals": ["full-stack", "monorepo", "deployment"]},
+      {"name": "Code Quality & Testing", "weight": 15, "description": "Test coverage, CI/CD, linting, type safety", "signals": ["Jest", "Cypress", "TypeScript", "CI"]},
+      {"name": "Architecture & Scalability", "weight": 15, "description": "System design, microservices, caching, performance", "signals": ["microservices", "Docker", "Redis", "scaling"]}
+    ],
+    "mustHave": ["React OR Vue", "Node.js OR Express"],
+    "niceToHave": ["TypeScript", "Docker", "CI/CD"],
+    "dealBreakers": ["No commits in 12 months"]
+  },
+  "searchStrategies": [
+    {"query": "language:JavaScript location:Milan followers:>=2", "priority": 1, "rationale": "Direct city match"},
+    {"query": "language:TypeScript location:Milan followers:>=2", "priority": 2, "rationale": "TypeScript variant"},
+    {"query": "language:JavaScript location:Milano followers:>=2", "priority": 3, "rationale": "Local spelling"},
+    {"query": "language:JavaScript location:Italy followers:>=2", "priority": 4, "rationale": "Country-wide"},
+    {"query": "language:TypeScript location:Italy followers:>=2", "priority": 5, "rationale": "Country + TS"},
+    {"query": "language:JavaScript location:Roma followers:>=2", "priority": 6, "rationale": "Major city expansion"}
+  ],
+  "version": 1
+}

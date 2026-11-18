@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest>=8
+pytest-bdd>=7
+hypothesis>=6
+jsonschema>=4

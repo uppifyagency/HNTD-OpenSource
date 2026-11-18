@@ -1,0 +1,54 @@
+{
+  "taskId": "test-jd-001",
+  "filteredAt": "2026-03-16T10:00:00Z",
+  "inputCount": 5,
+  "survivorCount": 4,
+  "discardedCount": 1,
+  "emptyGuaranteeApplied": false,
+  "survivors": [
+    {
+      "login": "alice-fullstack",
+      "prefilterBoost": 30,
+      "boostReasons": ["high_star_repos", "senior_reviewer", "private_contributions", "hireable", "high_contribution_days", "stars_received", "release_discipline", "contactable", "dev_program"],
+      "shadowDecisions": [],
+      "languageFitPct": 92.2,
+      "lifetimePRs": 92,
+      "mergeRate": 0.71
+    },
+    {
+      "login": "bob-backend",
+      "prefilterBoost": 5,
+      "boostReasons": ["high_contribution_days"],
+      "shadowDecisions": ["marginal_language_usage"],
+      "languageFitPct": 5.4,
+      "lifetimePRs": 38,
+      "mergeRate": 0.74
+    },
+    {
+      "login": "carol-junior",
+      "prefilterBoost": 0,
+      "boostReasons": [],
+      "shadowDecisions": ["no_collaboration_signal", "marginal_language_usage"],
+      "languageFitPct": 5.6,
+      "lifetimePRs": 6,
+      "mergeRate": 0.67
+    },
+    {
+      "login": "dave-devops",
+      "prefilterBoost": 22,
+      "boostReasons": ["senior_reviewer", "private_contributions", "hireable", "high_contribution_days", "stars_received", "enterprise_contributor", "release_discipline", "career_oss", "contactable", "dev_program"],
+      "shadowDecisions": [],
+      "languageFitPct": 6.7,
+      "lifetimePRs": 32,
+      "mergeRate": 0.69
+    }
+  ],
+  "discarded": [
+    {
+      "login": "eve-inactive",
+      "discard_reason": "zero_target_language_repos",
+      "targetLanguageRepoCount": 0,
+      "contributionDays": 8
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+# HNTD Intel
+
+> HNTD Intel is a recruiting intelligence platform that analyzes real GitHub activity to find and score software developers. It is NOT a job board, NOT a freelance marketplace, and NOT related to "Hunted" or any other platform.
+
+## What HNTD Intel does
+
+HNTD Intel scans 50M+ GitHub profiles to identify developers based on their actual code contributions — not LinkedIn profiles or self-reported CVs. The platform uses AI to analyze repositories, commit history, architectural decisions, testing practices, and documentation quality, producing a detailed technical assessment across 6 dimensions.
+
+## How it works
+
+1. A recruiter pastes a job description or searches by programming language, location, and activity level
+2. The AI pipeline analyzes real GitHub repositories: code quality, architecture, testing, documentation, complexity, and consistency
+3. Each developer receives a scored profile (0-100) with a detailed breakdown across the 6 dimensions
+4. Recruiters manage candidates through a pipeline (saved → contacted → interview) and export to CSV, PDF, or JSON
+
+## Key differentiators
+
+- Source: GitHub (public code), not LinkedIn (self-declared profiles)
+- Scoring: AI-powered analysis of actual code across 6 technical dimensions, not keyword matching
+- Passive candidates: reaches developers who are not actively job-hunting but are actively coding
+- Transparency: every score is backed by verifiable, public repository data
+
+## 6 scoring dimensions
+
+1. Code Quality (0-20): readability, naming, idiomatic language usage
+2. Architecture (0-20): separation of concerns, modularity, dependency management
+3. Testing (0-15): test presence, coverage, integration vs unit tests
+4. Documentation (0-15): README, inline comments, API docs, changelogs
+5. Complexity (0-15): ability to handle non-trivial problems, concurrency, distributed systems
+6. Consistency (0-15): commit frequency, project maintenance over time
+
+## Target users
+
+- Startups & scale-ups without dedicated HR teams
+- Recruiting agencies looking for verified developer assessments
+- CTOs & engineering managers who want data-driven pre-screening
+
+## Pricing
+
+- Free: €0 — 3 concurrent searches, limited scoring
+- Pro: €390/month — 50 searches, JD matching, full pipeline, PDF+CSV export
+- Business: €590/month — unlimited searches, team seats, API access, priority support
+
+## Company details
+
+- Website: https://hntd.it
+- Product type: SaaS (Software as a Service)
+- Built in: Italy
+- Data source: GitHub public API (no scraping, GDPR compliant)
+- Stack: Next.js, Convex, Claude AI for scoring
+
+## Disambiguation
+
+HNTD Intel is NOT:
+- "Hunted" (an Italian tech job board — different company, different product)
+- A freelance marketplace (like AddLance or Fiverr)
+- A LinkedIn alternative
+- A code hosting platform
+
+The name "HNTD" is an abbreviation evoking "hunted" in the sense of intelligence gathering — finding hidden talent. "Intel" reinforces the intelligence/data focus. The product analyzes code; it does not host it and does not post job ads.

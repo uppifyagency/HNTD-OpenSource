@@ -1,0 +1,15 @@
+{
+  "clusterId": 0,
+  "rankings": [
+    {
+      "login": "dave-devops",
+      "normalizedScore": 50.5,
+      "rankComment": "Stronger architecture and documentation than bob-backend, with production-ready Terraform modules"
+    },
+    {
+      "login": "bob-backend",
+      "normalizedScore": 35.0,
+      "rankComment": "Solid Spring Boot patterns but less architectural sophistication than dave-devops"
+    }
+  ]
+}
