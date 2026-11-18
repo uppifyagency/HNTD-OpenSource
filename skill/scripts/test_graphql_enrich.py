@@ -1,6 +1,17 @@
 """Tests for graphql_enrich.py — data extraction logic (no API calls)."""
+import json
+import os
+import sys
+from pathlib import Path
+
 import pytest
+
+import graphql_enrich
+import pipeline_logger
 from graphql_enrich import extract_developer, build_batch_query
+
+FAKE_GH_DIR = Path(__file__).parent / "fixtures" / "fake_gh"
+LOGINS = ["alice", "bob", "carol", "dave", "erin", "frank", "grace"]
 
 
 class TestBuildBatchQuery:
@@ -186,3 +197,61 @@ class TestExtractDeveloper:
         python_bytes = next(lb for lb in dev["languageBytes"] if lb["language"] == "Python")
         assert python_bytes["bytes"] == 80000
         assert dev["targetLanguageRepoCount"] == 2
+
+
+class TestGatewayTimeoutSplitting:
+    """A batch GitHub answers with 502/504 is split down to single users."""
+
+    @pytest.fixture
+    def pipeline_warnings(self, monkeypatch):
+        warnings = []
+        monkeypatch.setattr(pipeline_logger, "_try_convex_log",
+                            lambda phase, message, level, metadata=None: level == "warn" and warnings.append(message))
+        return warnings
+
+    @pytest.fixture
+    def run_enrich(self, tmp_path, monkeypatch, pipeline_warnings):
+        monkeypatch.setenv("FAKE_GH_CALL_LOG", str(tmp_path / "gh-calls.log"))
+        monkeypatch.setattr(graphql_enrich, "OUTPUT_DIR", tmp_path)
+        monkeypatch.setenv("PATH", f"{FAKE_GH_DIR}{os.pathsep}{os.environ['PATH']}")
+        (tmp_path / "search-t.json").write_text(json.dumps({"developers": [{"login": l} for l in LOGINS]}))
+
+        def run(name, **fake_env):
+            for key in ("FAKE_GH_MAX_ALIASES", "FAKE_GH_ALWAYS_502", "FAKE_GH_RESOURCE_LIMITS"):
+                monkeypatch.delenv(key, raising=False)
+            for key, value in fake_env.items():
+                monkeypatch.setenv(key, value)
+            monkeypatch.setattr(sys, "argv", ["graphql_enrich.py", "--task-id", "t", "--batch-size", "5",
+                                              "--target-languages", "Python", "--output-file", name])
+            graphql_enrich.main()
+            return (tmp_path / name).read_bytes()
+
+        return run
+
+    def test_heavy_batches_are_split_and_output_matches_all_success(self, run_enrich):
+        baseline = run_enrich("all-ok.json")
+        split = run_enrich("split.json", FAKE_GH_MAX_ALIASES="1")
+
+        devs = json.loads(split)["developers"]
+        assert [d["login"] for d in devs] == LOGINS
+        assert not any(d["scanError"] for d in devs)
+        assert split == baseline
+
+    @pytest.mark.parametrize("too_heavy", [{}, {"FAKE_GH_RESOURCE_LIMITS": "1"}], ids=["gateway-502", "resource-limits"])
+    def test_split_batches_log_no_failures_and_need_no_per_user_calls(self, run_enrich, pipeline_warnings, tmp_path, too_heavy):
+        baseline = run_enrich("all-ok.json")
+        (tmp_path / "gh-calls.log").unlink()
+        split = run_enrich("split.json", FAKE_GH_MAX_ALIASES="4", **too_heavy)
+
+        assert split == baseline
+        assert pipeline_warnings == []
+        alias_counts = [int(n) for n in (tmp_path / "gh-calls.log").read_text().split()]
+        assert 1 not in alias_counts
+
+    def test_single_user_that_always_502s_keeps_scan_error(self, run_enrich):
+        baseline = json.loads(run_enrich("all-ok.json"))["developers"]
+        devs = json.loads(run_enrich("poisoned.json", FAKE_GH_ALWAYS_502="carol"))["developers"]
+
+        assert [d["login"] for d in devs] == LOGINS
+        assert devs[2] == {"login": "carol", "scanError": True}
+        assert devs[:2] + devs[3:] == baseline[:2] + baseline[3:]

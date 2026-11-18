@@ -7,11 +7,13 @@ Uses GraphQL alias batching: 5 users per API call instead of 1.
 """
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
+TOO_HEAVY = re.compile(r"\bHTTP 50[24]\b|Resource limits for this query exceeded")
 
 # GraphQL fragment with ALL fields (profile + expanded data)
 USER_FIELDS_FRAGMENT = """
@@ -106,11 +108,21 @@ def build_batch_query(logins: list[str]) -> str:
 
 
 def run_graphql_batch(logins: list[str]) -> dict:
-    """Execute a batched GraphQL query for multiple users."""
+    """Execute a batched GraphQL query for multiple users.
+
+    GitHub answers a too-heavy batch either from its gateway with 502/504 (gh prints
+    "gh: HTTP 502") or from GraphQL with "Resource limits for this query exceeded.",
+    so such a batch is halved and each half retried, down to single users.
+    """
     query = build_batch_query(logins)
     cmd = ["gh", "api", "graphql", "-f", f"query={query}"]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, encoding="utf-8", errors="replace")
+        if result.returncode != 0 and len(logins) > 1 and TOO_HEAVY.search(result.stderr):
+            mid = len(logins) // 2
+            print(f"  [graphql] {result.stderr.strip()[:200]}: splitting batch {len(logins)} -> {mid}+{len(logins) - mid}")
+            left, right = run_graphql_batch(logins[:mid]), run_graphql_batch(logins[mid:])
+            return {**left, **{f"u{int(k[1:]) + mid}": v for k, v in right.items()}}
         if result.returncode != 0:
             print(f"  [graphql] WARNING: batch query failed: {result.stderr.strip()[:200]}")
             return {}
@@ -279,7 +291,7 @@ def extract_developer(login: str, user_data: dict, target_languages: list[str]) 
 def main():
     parser = argparse.ArgumentParser(description="GraphQL enrichment with batched alias queries")
     parser.add_argument("--task-id", required=True, help="Task ID")
-    parser.add_argument("--target-languages", nargs="+", default=[], help="Target languages for repo count")
+    parser.add_argument("--target-languages", nargs="*", default=[], help="Target languages for repo count")
     parser.add_argument("--batch-size", type=int, default=3, help="Users per GraphQL call")
     parser.add_argument("--search-file", help="Override search input file")
     parser.add_argument("--output-file", help="Override output file name")

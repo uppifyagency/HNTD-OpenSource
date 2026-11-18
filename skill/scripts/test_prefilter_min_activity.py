@@ -77,7 +77,14 @@ class TestMinActivityRule:
 
     def test_zero_target_repos_still_dominates(self):
         dev = _dev(["2026-05-20T00:00:00Z"], targetLanguageRepoCount=0)
-        assert apply_discard_rules(dev, min_activity=3, now=NOW) == "zero_target_language_repos"
+        assert apply_discard_rules(dev, min_activity=3, target_languages=["python"],
+                                   now=NOW) == "zero_target_language_repos"
+
+    def test_no_target_language_means_no_language_rule(self):
+        """A location-only search has no target language: nobody fails a language rule."""
+        dev = _dev(["2026-05-20T00:00:00Z"], targetLanguageRepoCount=0)
+        assert apply_discard_rules(dev, min_activity=3, target_languages=[], now=NOW) is None
+        assert apply_discard_rules(dev, min_activity=3, now=NOW) is None
 
     def test_contribution_days_no_longer_used(self):
         """A recently-pushing dev with low contributionDays must survive."""

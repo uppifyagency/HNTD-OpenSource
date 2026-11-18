@@ -25,11 +25,25 @@ require_local_skill_env() {
   fi
 }
 
-write_skill_env() {  # $1 = API secret
+write_skill_env() {  # $1 = API secret, $2 = GitHub token (optional; default: keep the stored one)
   local site; site=$(env_get "$ENV_FILE" NEXT_PUBLIC_CONVEX_SITE_URL)
   case "$site" in http://127.0.0.1:*) ;; *) echo "refusing: Convex site URL '$site' is not local"; exit 1;; esac
-  printf 'CONVEX_SITE_URL=%s\nAPI_SECRET=%s\n' "$site" "$1" > "$SKILL_ENV"
-  chmod 600 "$SKILL_ENV"
+  local token=${2:-$(env_get "$SKILL_ENV" GH_TOKEN)}
+  # umask must cover the redirection itself, which the subshell opens: the file holds secrets.
+  ( umask 077
+    { printf 'CONVEX_SITE_URL=%s\nAPI_SECRET=%s\n' "$site" "$1"
+      [ -z "$token" ] || printf 'GH_TOKEN=%s\n' "$token"
+    } > "$SKILL_ENV.tmp"
+  )
+  chmod 600 "$SKILL_ENV.tmp"  # a leftover .tmp keeps its old mode
+  mv "$SKILL_ENV.tmp" "$SKILL_ENV"
+}
+
+# Prints the login of a GitHub token GitHub accepts (scripts/local/github_token.py), with a warning
+# on stderr when the token could write. Otherwise prints why not on stderr and fails. The token goes in
+# on stdin, never on a command line (ps) or in a log.
+github_login() {  # $1 = token
+  printf '%s\n' "$1" | python3 scripts/local/github_token.py
 }
 
 # Kill a pid and every descendant (npx -> node -> convex local backend).
@@ -47,6 +61,7 @@ start_convex() {
   for _ in $(seq 180); do
     local url; url=$(env_get "$ENV_FILE" NEXT_PUBLIC_CONVEX_URL)
     if grep -q '^CONVEX_DEPLOYMENT=anonymous:' "$ENV_FILE" && [ -n "$url" ] && curl -sf -m 2 "$url/version" >/dev/null; then
+      chmod 600 "$ENV_FILE"  # holds the session signing key; convex dev rewrites it
       return 0
     fi
     kill -0 "$CONVEX_PID" 2>/dev/null || { echo "convex dev exited early; log:"; tail -20 "$1"; exit 1; }

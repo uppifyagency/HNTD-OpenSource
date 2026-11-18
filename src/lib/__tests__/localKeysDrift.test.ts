@@ -9,6 +9,7 @@ import { parse } from "dotenv";
 import { afterAll, describe, expect, it } from "vitest";
 import { LOCAL_ISSUER } from "../../../convex/localAuth";
 import { signLocalToken } from "@/lib/session/localToken";
+import { browserKey } from "@/lib/session/loopback";
 
 const ROOT = path.resolve(__dirname, "../../..");
 const KEYS = path.join(ROOT, "scripts/local/keys.mjs");
@@ -32,6 +33,12 @@ describe("scripts/local/keys.mjs and signLocalToken", () => {
       .update(`${header}.${payload}`)
       .verify(createPublicKey({ key: jwk, format: "jwk" }), Buffer.from(signature, "base64url"));
     expect(ok).toBe(true);
+  });
+
+  it("the browser key run.sh prints is the one the routes accept", () => {
+    execFileSync("node", [KEYS, "init"], { cwd: dir });
+    const pem = parse(readFileSync(path.join(dir, ".env.local"))).LOCAL_AUTH_PRIVATE_KEY;
+    expect(execFileSync("node", [KEYS, "browser-key"], { cwd: dir }).toString()).toBe(browserKey(pem));
   });
 });
 

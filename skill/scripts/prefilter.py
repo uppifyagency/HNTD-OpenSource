@@ -26,7 +26,7 @@ def parse_args(argv=None):
     parser.add_argument("--task-id", required=True, help="Pipeline task ID")
     parser.add_argument(
         "--target-languages",
-        nargs="+",
+        nargs="*",
         required=False,
         default=[],
         help="Target programming languages for shadow rules and languageFitPct",
@@ -122,17 +122,14 @@ def apply_discard_rules(dev: dict, min_activity: int,
     if dev.get("scanError"):
         return None
 
-    # Rule 1: zero target language repos (with languageBytes fallback)
+    # Rule 1: zero target language repos (with languageBytes fallback). A search with no
+    # target language (location-only) has no language rule to fail.
     target_repo_count = dev.get("targetLanguageRepoCount")
-    if target_repo_count is not None and target_repo_count == 0:
-        # Fallback: check if developer has significant language bytes in target language
-        if target_languages:
-            lang_fit = compute_language_fit_pct(dev, target_languages)
-            if lang_fit >= LANGUAGE_BYTES_THRESHOLD:
-                login = dev.get("login", "unknown")
-                print(f"  [prefilter] {login}: rescued by languageBytes ({lang_fit:.1f}% >= {LANGUAGE_BYTES_THRESHOLD}%)")
-            else:
-                return "zero_target_language_repos"
+    if target_languages and target_repo_count is not None and target_repo_count == 0:
+        lang_fit = compute_language_fit_pct(dev, target_languages)
+        if lang_fit >= LANGUAGE_BYTES_THRESHOLD:
+            login = dev.get("login", "unknown")
+            print(f"  [prefilter] {login}: rescued by languageBytes ({lang_fit:.1f}% >= {LANGUAGE_BYTES_THRESHOLD}%)")
         else:
             return "zero_target_language_repos"
 

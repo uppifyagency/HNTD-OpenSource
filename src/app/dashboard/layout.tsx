@@ -1,5 +1,7 @@
 import { EditorialShell } from "@/components/editorial/EditorialShell";
 import EnsureUser from "@/components/EnsureUser";
+import { LocalPipelineStatus } from "@/components/editorial/LocalPipelineStatus";
+import { APP_MODE } from "@/lib/mode";
 
 /**
  * Dashboard layout — CUTOVER: editorial chrome for the whole authenticated app.
@@ -15,6 +17,7 @@ export default function DashboardLayout({
 }) {
   return (
     <EditorialShell>
+      {APP_MODE === "local" && <LocalPipelineStatus />}
       <EnsureUser>{children}</EnsureUser>
     </EditorialShell>
   );

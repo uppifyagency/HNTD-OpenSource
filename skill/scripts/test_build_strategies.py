@@ -375,5 +375,40 @@ class TestLocationAliasesRestructure(unittest.TestCase):
                                f"{country} has an empty city-group")
 
 
+class TestLocationOnly(unittest.TestCase):
+    """A search with a location and no language (the UI allows languages: [])."""
+
+    def test_location_only_queries_have_no_language_qualifier(self):
+        result = build_strategies(languages=[], locations=["modena"])
+        self.assertEqual([s["query"] for s in result],
+                         ["location:modena followers:>=2"])
+        self.assertEqual(result[0]["priorityTier"], "exact_city")
+
+    def test_location_only_country_path_expands_cities(self):
+        result = build_strategies(languages=[], locations=[], country="italy", city="modena")
+        queries = [s["query"] for s in result]
+        self.assertEqual(queries[0], "location:modena followers:>=2")
+        self.assertIn("location:italy followers:>=2", queries)
+        self.assertTrue(all("language:" not in q for q in queries))
+
+    def test_location_only_keywords_drop_language(self):
+        result = build_strategies(languages=[], locations=["modena"], keywords=["react"])
+        self.assertIn('"react" followers:>=2', [s["query"] for s in result])
+
+    def test_cli_accepts_no_languages(self):
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as out:
+            env = dict(os.environ, CONVEX_SITE_URL="http://127.0.0.1:9", API_SECRET="x")
+            proc = subprocess.run(
+                [sys.executable, os.path.join(os.path.dirname(__file__), "build_strategies.py"),
+                 "--task-id", "t-loc", "--locations", "modena", "--output-dir", out],
+                capture_output=True, text=True, env=env)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            with open(os.path.join(out, "strategies-t-loc.json")) as f:
+                self.assertEqual([s["query"] for s in json.load(f)],
+                                 ["location:modena followers:>=2"])
+
+
 if __name__ == "__main__":
     unittest.main()

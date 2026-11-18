@@ -231,17 +231,22 @@ def sanitize_languages(raw_languages: list[str], raw_keywords: list[str] | None 
     return valid_languages, keywords
 
 
-def _location_query(language: str, location: str, min_followers: int) -> str:
+def _language_qualifier(language: str | None) -> str:
+    """`language:x ` or nothing: a location-only search (no language) has no qualifier."""
+    return f"language:{language} " if language else ""
+
+
+def _location_query(language: str | None, location: str, min_followers: int) -> str:
     """Render a `language:.. location:.. followers:>=..` GitHub search query."""
-    return f"language:{language} location:{location} followers:>={min_followers}"
+    return f"{_language_qualifier(language)}location:{location} followers:>={min_followers}"
 
 
-def _keyword_query(keyword: str, language: str, min_followers: int) -> str:
+def _keyword_query(keyword: str, language: str | None, min_followers: int) -> str:
     """Render a quoted-keyword `"kw" language:.. followers:>=..` search query."""
-    return f'"{keyword}" language:{language} followers:>={min_followers}'
+    return f'"{keyword}" {_language_qualifier(language)}followers:>={min_followers}'
 
 
-def _emit_city_groups(strategies, seen_queries, city_groups, lang, lang_lower,
+def _emit_city_groups(strategies, seen_queries, city_groups, label, lang_lower,
                       min_followers, priority, tier_label, tier_for,
                       skip_group=None):
     """Emit one strategy per spelling variant across a list of city-groups.
@@ -262,7 +267,7 @@ def _emit_city_groups(strategies, seen_queries, city_groups, lang, lang_lower,
             _add(strategies, seen_queries,
                  query=_location_query(lang_lower, alias_city, min_followers),
                  priority=priority,
-                 rationale=f"{tier_label}: {lang} + {alias_city}",
+                 rationale=f"{tier_label}: {label} + {alias_city}",
                  priority_tier=tier_for(alias_city))
 
 
@@ -289,6 +294,8 @@ def build_strategies(
     # Sanitize: resolve non-language terms, split combined strings
     languages, keywords_merged = sanitize_languages(languages, keywords)
     keywords = keywords_merged
+    # No language (a location-only search): one pass whose queries carry no `language:`.
+    languages = languages or [None]
 
     strategies = []
     seen_queries = set()
@@ -303,7 +310,8 @@ def build_strategies(
         cities = entry["cities"] if entry else []
 
         for lang in languages:
-            lang_lower = lang.lower()
+            lang_lower = lang.lower() if lang else None
+            label = lang or "any language"
 
             # P1: exact city (split comma-separated cities into individual queries)
             if city:
@@ -312,7 +320,7 @@ def build_strategies(
                     _add(strategies, seen_queries,
                          query=_location_query(lang_lower, city_lower, min_followers),
                          priority=1,
-                         rationale=f"Exact city: {lang} + {city_lower}",
+                         rationale=f"Exact city: {label} + {city_lower}",
                          priority_tier=classify_tier(city_lower, city, country))
 
             # P2: country names (English + local spellings) -- old country_lower
@@ -321,7 +329,7 @@ def build_strategies(
                 _add(strategies, seen_queries,
                      query=_location_query(lang_lower, country_name, min_followers),
                      priority=2,
-                     rationale=f"Country: {lang} + {country_name}",
+                     rationale=f"Country: {label} + {country_name}",
                      priority_tier=classify_tier(country_name, city, country))
 
             # The requested city's spelling-variant group is already covered
@@ -334,13 +342,13 @@ def build_strategies(
 
             # P3: major cities -- cities[0:2] (old aliases[1:5] slice).
             _emit_city_groups(strategies, seen_queries,
-                              cities[0:MAJOR_CITY_BOUNDARY], lang, lang_lower,
+                              cities[0:MAJOR_CITY_BOUNDARY], label, lang_lower,
                               min_followers, 3, "Major city", classify,
                               skip_group=requested_group)
 
             # P4: extended cities -- cities[2:] (old aliases[5:] slice).
             _emit_city_groups(strategies, seen_queries,
-                              cities[MAJOR_CITY_BOUNDARY:], lang, lang_lower,
+                              cities[MAJOR_CITY_BOUNDARY:], label, lang_lower,
                               min_followers, 4, "Extended city", classify,
                               skip_group=requested_group)
 
@@ -349,14 +357,15 @@ def build_strategies(
                 _add(strategies, seen_queries,
                      query=_keyword_query(kw, lang_lower, min_followers),
                      priority=5,
-                     rationale=f"Keyword match: {lang} + {kw}",
+                     rationale=f"Keyword match: {label} + {kw}",
                      priority_tier=PRIORITY_TO_TIER[5])
 
         strategies.sort(key=lambda s: s["priority"])
         return strategies
 
     for lang in languages:
-        lang_lower = lang.lower()
+        lang_lower = lang.lower() if lang else None
+        label = lang or "any language"
 
         for loc in locations:
             loc_lower = loc.lower()
@@ -371,7 +380,7 @@ def build_strategies(
             _add(strategies, seen_queries,
                  query=_location_query(lang_lower, loc_lower, min_followers),
                  priority=1,
-                 rationale=f"Direct match: {lang} + {loc}",
+                 rationale=f"Direct match: {label} + {loc}",
                  priority_tier=PRIORITY_TO_TIER[1])
 
             # Expand aliases if this is a known country key (ADR-022 city-group
@@ -388,18 +397,18 @@ def build_strategies(
                 _add(strategies, seen_queries,
                      query=_location_query(lang_lower, country_name, min_followers),
                      priority=2,
-                     rationale=f"Local spelling: {lang} + {country_name}",
+                     rationale=f"Local spelling: {label} + {country_name}",
                      priority_tier=PRIORITY_TO_TIER[2])
 
             # P3/P4: major + extended city expansion. The legacy locations path
             # carries no requested-city context, so priorityTier is the fixed
             # PRIORITY_TO_TIER slot for the priority band (ADR-020).
             _emit_city_groups(strategies, seen_queries,
-                              cities[0:MAJOR_CITY_BOUNDARY], lang, lang_lower,
+                              cities[0:MAJOR_CITY_BOUNDARY], label, lang_lower,
                               min_followers, 3, "Major city",
                               lambda _: PRIORITY_TO_TIER[3])
             _emit_city_groups(strategies, seen_queries,
-                              cities[MAJOR_CITY_BOUNDARY:], lang, lang_lower,
+                              cities[MAJOR_CITY_BOUNDARY:], label, lang_lower,
                               min_followers, 4, "Extended city",
                               lambda _: PRIORITY_TO_TIER[4])
 
@@ -408,7 +417,7 @@ def build_strategies(
             _add(strategies, seen_queries,
                  query=_keyword_query(kw, lang_lower, min_followers),
                  priority=5,
-                 rationale=f"Keyword match: {lang} + {kw}",
+                 rationale=f"Keyword match: {label} + {kw}",
                  priority_tier=PRIORITY_TO_TIER[5])
 
     strategies.sort(key=lambda s: s["priority"])
@@ -504,7 +513,8 @@ def _add(strategies, seen, query, priority, rationale, priority_tier):
 def main():
     parser = argparse.ArgumentParser(description="Build search strategies for manual mode")
     parser.add_argument("--task-id", required=True, help="Convex task ID")
-    parser.add_argument("--languages", nargs="+", required=True)
+    # Empty or omitted = a location-only search (the dashboard allows languages: []).
+    parser.add_argument("--languages", nargs="*", default=[])
     parser.add_argument("--locations", nargs="*", default=[])
     parser.add_argument("--keywords", nargs="*", default=[])
     parser.add_argument("--min-followers", type=int, default=2)

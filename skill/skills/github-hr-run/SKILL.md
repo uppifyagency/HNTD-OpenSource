@@ -35,6 +35,13 @@ description: >
    - Scorer: max 6 per batch (adaptive — see Phase 4)
    - Ranker: max 8 per cluster
 
+5. **The run is unattended.** Nobody reads this session until it ends (the local worker or the
+   cron started it). NEVER ask a question, offer options, or wait for a reply, and never end the
+   turn before Phase 9. The only stops are the "mark task failed and STOP" paths in this file.
+   On doubt about data quality or a surprising number, log a `warn` pipeline event that
+   describes it, continue with the files on disk, and repeat it in the Phase 9 summary. Never
+   edit `.py`, `.md` or config files during a run.
+
 ## Execution Flow
 
 ### Phase 0: Checkpoint Check (Resume Support)
@@ -197,6 +204,9 @@ python skill/scripts/build_strategies.py \
 ```
 
 **Optional params** — append ONLY if present (non-null, non-empty) in task.params:
+- `--languages`: when `task.params.languages` is empty, drop the flag. A location-only search is
+  valid: the strategies then carry no `language:` qualifier. The same holds for every
+  `--target-languages` flag below (Phases 2.5 and 2.7): omit it when the task has no languages.
 - `--country <task.params.country>` (if task.params.country is set)
 - `--city <task.params.city>` (if task.params.city is set)
 - `--keywords <task.params.keywords joined by space>` (if task.params.keywords is non-empty)
@@ -663,6 +673,13 @@ python skill/scripts/triage_clusters.py <TASK_ID>
 **Step 2:** For each cluster in `triage-<TASK_ID>.json`, dispatch `github-hr-ranker` subagent **only for ambiguous clusters** (size >= 2). Isolated developers keep their `deterministicRank` as `normalizedScore`.
 
 For forcedAI clusters, always dispatch the ranker.
+
+**Scale, by design:** triage clusters on `deterministicRank` (Phase 4.5), a weighted blend in
+which code quality is one term, so `normalizedScore` lands on the deterministicRank scale, not
+on the Pass 1 `score` scale. A Pass 1 score of 86 that becomes a normalizedScore of 44 in a
+[34, 40] cluster is the intended result, not a bug: `score`, `objectiveScore`,
+`normalizedScore` and `matchConfidence` are different fields. Do not report it as an error,
+do not edit the triage or ranker files, and proceed to Step 3.
 
 **Dispatch per cluster:** `github-hr-ranker` subagent (same as before)
 

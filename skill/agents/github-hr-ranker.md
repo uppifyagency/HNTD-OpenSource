@@ -21,6 +21,12 @@ You receive:
 3. **Scoring rubric**: Either the fixed 6-dimension rubric (manual mode) or a dynamic rubric (JD mode)
 4. **Global context**: The score range of this cluster, plus scores of developers above and below
 
+`clusterMin` and `clusterMax` come from the triage `scoreRange`, which is on the
+**deterministicRank** scale (a weighted blend of language fit, collaboration, code quality and
+maturity), not on the Pass 1 0-100 scale. It is often far lower than the Pass 1 score. A
+developer with Pass 1 score 86 in a [34, 40] cluster legitimately gets a normalizedScore near
+40: that is by design, not a scale bug. Use Pass 1 scores only as context for the ordering.
+
 ## Your Task
 
 ### 1. Re-read all code

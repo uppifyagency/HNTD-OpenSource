@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { Filing } from "@/components/editorial";
+import { APP_MODE } from "@/lib/mode";
 import type { TaskResultsVM, SortBy } from "@/lib/taskResults/taskResultsViewModel";
 
 /**
@@ -165,7 +166,12 @@ export function EditorialTaskResults({ vm, onSort, onProcessNow, processing, del
       {/* LIFECYCLE */}
       {vm.phase === "pending" && (
         <StateCard>
-          {vm.priority ? (
+          {APP_MODE === "local" ? (
+            <>
+              <p className="mono" style={{ margin: "0 0 6px" }}>Task in coda.</p>
+              <p className="mono dim" style={{ fontSize: 13, margin: 0 }}>La pipeline locale la avvia appena è libera, una ricerca alla volta.</p>
+            </>
+          ) : vm.priority ? (
             <>
               <p className="mono" style={{ margin: "0 0 6px" }}>In coda prioritaria.</p>
               <p className="mono dim" style={{ fontSize: 13, margin: 0 }}>L&apos;elaborazione partirà entro 5 minuti.</p>

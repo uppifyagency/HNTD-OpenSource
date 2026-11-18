@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { APP_MODE } from "@/lib/mode";
 import { getServerUserId } from "@/lib/session/server";
-import { isLoopbackRequest } from "@/lib/session/loopback";
+import { isLocalBrowser } from "@/lib/session/loopback";
 import { completeJson, LlmJsonError } from "@/lib/llm";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../convex/_generated/api";
@@ -45,8 +45,8 @@ function isValidParseResult(parsed: unknown): parsed is { category: string | nul
 }
 
 export async function POST(req: NextRequest) {
-  // Local mode has no login, so only a loopback page may spend the user's claude CLI.
-  if (APP_MODE === "local" && !isLoopbackRequest(req.headers)) {
+  // Local mode has no login, so only the user's browser may spend their claude CLI.
+  if (APP_MODE === "local" && !isLocalBrowser(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   // Validate the session server-side before any processing or LLM call

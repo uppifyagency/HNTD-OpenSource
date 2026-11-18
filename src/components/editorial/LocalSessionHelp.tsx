@@ -10,13 +10,13 @@ export function LocalSessionHelp() {
     <EditorialAuth
       kicker="modalità locale"
       title={<>Nessun login.<br /><span className="serif-it">Sei già dentro.</span></>}
-      lede="In locale non serve un account: la dashboard ti riconosce da sola. Se sei finito qui, la sessione locale non è partita."
+      lede="In locale non serve un account. Questo browser però non è ancora stato collegato: apri una volta il link che npm run local stampa nel terminale."
       footer={<>riprova: <a href="/dashboard" style={{ color: "var(--ink)", textDecoration: "underline", textUnderlineOffset: 3 }}>→ dashboard</a></>}
     >
       <ol className="mono" style={{ fontSize: 13, lineHeight: 1.9, paddingLeft: 18, margin: 0 }}>
-        <li>ferma <code>npm run local</code></li>
-        <li>esegui <code>scripts/local/setup.sh</code></li>
-        <li>rilancia <code>npm run local</code></li>
+        <li>guarda il terminale dove gira <code>npm run local</code></li>
+        <li>apri il link <code>HNTD local: http://127.0.0.1:…/api/local-session?key=…</code></li>
+        <li>se il link non c&apos;è: ferma, esegui <code>scripts/local/setup.sh</code>, rilancia</li>
       </ol>
     </EditorialAuth>
   );

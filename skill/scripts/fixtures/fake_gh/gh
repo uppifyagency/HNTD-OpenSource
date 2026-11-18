@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Fake `gh api graphql` for test_graphql_enrich.py.
+
+Answers like GitHub when a batch is too heavy: `gh: HTTP 502` (the gateway) on
+stderr and exit 1. Knobs (env):
+  FAKE_GH_MAX_ALIASES  batches with more aliases than this are too heavy (default: no limit)
+  FAKE_GH_ALWAYS_502   comma-separated logins whose presence always triggers a 502
+  FAKE_GH_RESOURCE_LIMITS  if set, a too-heavy batch gets GraphQL's "Resource limits for this
+                       query exceeded." (HTTP 200 with errors, which gh turns into exit 1) instead
+  FAKE_GH_CALL_LOG     file that gets one line per call: the alias count
+"""
+import json
+import os
+import re
+import sys
+
+query = next(a[len("query="):] for a in sys.argv if a.startswith("query="))
+logins = re.findall(r'(u\d+): user\(login: "([^"]+)"\)', query)
+
+log = os.environ.get("FAKE_GH_CALL_LOG")
+if log:
+    with open(log, "a") as f:
+        f.write(f"{len(logins)}\n")
+
+max_aliases = int(os.environ.get("FAKE_GH_MAX_ALIASES", "1000000"))
+poisoned = set(filter(None, os.environ.get("FAKE_GH_ALWAYS_502", "").split(",")))
+if len(logins) > max_aliases and os.environ.get("FAKE_GH_RESOURCE_LIMITS"):
+    message = "Resource limits for this query exceeded."
+    print(json.dumps({"data": {alias: None for alias, _ in logins},
+                      "errors": [{"message": message} for _ in logins]}))
+    sys.stderr.write("gh: " + "\n".join(message for _ in logins) + "\n")
+    sys.exit(1)
+if len(logins) > max_aliases or poisoned & {login for _, login in logins}:
+    sys.stderr.write("gh: HTTP 502\n")
+    sys.exit(1)
+
+
+def user(login):
+    return {
+        "login": login,
+        "name": login.upper(),
+        "followers": {"totalCount": len(login)},
+        "repositories": {"totalCount": 3},
+        "topRepositories": {"nodes": [{
+            "name": f"{login}-repo",
+            "nameWithOwner": f"{login}/{login}-repo",
+            "primaryLanguage": {"name": "Python"},
+            "stargazerCount": len(login) * 7,
+            "languages": {"edges": [{"size": 1000, "node": {"name": "Python"}}]},
+        }]},
+    }
+
+
+print(json.dumps({"data": {alias: user(login) for alias, login in logins}}))
