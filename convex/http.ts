@@ -1165,11 +1165,18 @@ http.route({
 
       let recovered = 0;
       for (const task of tasks) {
-        await ctx.runMutation(internal.tasks.updateTaskStatus, {
-          taskId: task._id,
-          status: "pending" as const,
-          error: `Auto-recovered: stuck processing since ${task.processingStartedAt ? new Date(task.processingStartedAt).toISOString() : 'unknown time'}`,
-        });
+        try {
+          await ctx.runMutation(internal.tasks.updateTaskStatus, {
+            taskId: task._id,
+            status: "pending" as const,
+            error: `Auto-recovered: stuck processing since ${task.processingStartedAt ? new Date(task.processingStartedAt).toISOString() : 'unknown time'}`,
+          });
+        } catch (error) {
+          // The search completed between the stale read and this write: nothing to recover,
+          // and the stale searches after it still need their turn.
+          if (error instanceof ConvexError && error.data?.code === "invalid_transition") continue;
+          throw error;
+        }
         await ctx.runMutation(internal.pipelineLogs.insertLog, {
           taskId: task._id as string,
           phase: "watchdog",
