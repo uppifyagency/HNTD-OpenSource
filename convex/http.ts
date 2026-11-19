@@ -329,7 +329,7 @@ http.route({
     if (authErr) return authErr;
 
     try {
-      const { taskId } = await request.json();
+      const { taskId, claimId } = await request.json();
       if (!taskId || typeof taskId !== "string") {
         return new Response(JSON.stringify({ error: "taskId is required" }), {
           status: 400,
@@ -337,7 +337,14 @@ http.route({
         });
       }
 
-      const claim = await ctx.runMutation(internal.tasks.claimTask, { taskId: taskId as Id<"tasks"> });
+      if (claimId !== undefined && (typeof claimId !== "string" || !claimId.trim() || claimId.length > 128)) {
+        return Response.json({ error: "claimId must be a non-empty string of at most 128 characters" }, { status: 400 });
+      }
+
+      const claim = await ctx.runMutation(internal.tasks.claimTask, {
+        taskId: taskId as Id<"tasks">,
+        claimId,
+      });
       if (claim.outcome === "task_not_found") {
         return new Response(JSON.stringify({ error: "Task not found", code: "task_not_found" }), {
           status: 404,

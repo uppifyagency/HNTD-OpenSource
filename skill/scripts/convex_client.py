@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import time
+import uuid
 import requests
 from dotenv import load_dotenv
 
@@ -107,7 +108,8 @@ def complete_task(task_id: str, developer_ids: list[str], error: str = None):
 def claim_task(task_id: str) -> dict:
     """Returns {"claimed": True}, or {"claimed": False, "status": <current status>} when the task
     is not pending. Raises TaskNotFound when it is gone."""
-    return _post_task("/api/claim-task", {"taskId": task_id}).json()
+    # Generate once per logical claim so transport retries can recover a lost grant.
+    return _post_task("/api/claim-task", {"taskId": task_id, "claimId": str(uuid.uuid4())}).json()
 
 
 CLAIMED_BY_WORKER_ENV = "HNTD_CLAIMED_TASK"  # set by scripts/local/worker.py for the run it starts

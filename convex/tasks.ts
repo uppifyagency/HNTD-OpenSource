@@ -176,7 +176,7 @@ export const updateTaskStatus = internalMutation({
     if (!task) throw new Error("Task not found");
     assertTransition(task.status, args.status);
 
-    const updates: Record<string, unknown> = { status: args.status };
+    const updates: Record<string, unknown> = { status: args.status, claimId: undefined };
     if (args.status === "failed") {
       updates.processingStartedAt = undefined;
     }
@@ -190,7 +190,7 @@ export const updateTaskStatus = internalMutation({
 // so of two runs that claim the same search only one is granted it. A refusal is an
 // expected answer, not an error: the caller leaves the search alone.
 export const claimTask = internalMutation({
-  args: { taskId: v.id("tasks") },
+  args: { taskId: v.id("tasks"), claimId: v.optional(v.string()) },
   returns: v.union(
     v.object({ outcome: v.literal("claimed") }),
     v.object({
@@ -207,10 +207,13 @@ export const claimTask = internalMutation({
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) return { outcome: "task_not_found" as const };
+    if (task.status === "processing" && args.claimId !== undefined && task.claimId === args.claimId) {
+      return { outcome: "claimed" as const };
+    }
     if (!checkStatusTransition(task.status, "processing").allowed) {
       return { outcome: "refused" as const, status: task.status };
     }
-    await ctx.db.patch(args.taskId, { status: "processing", processingStartedAt: Date.now() });
+    await ctx.db.patch(args.taskId, { status: "processing", processingStartedAt: Date.now(), claimId: args.claimId });
     return { outcome: "claimed" as const };
   },
 });
@@ -243,6 +246,7 @@ export const completeTask = internalMutation({
       status: "completed",
       completedAt: now,
       resultCount: args.developerIds.length,
+      claimId: undefined,
       processingStartedAt: undefined,
       ...(errorMsg ? { error: errorMsg } : {}),
     });
@@ -363,6 +367,7 @@ export const resetTask = mutation({
       error: undefined,
       completedAt: undefined,
       resultCount: undefined,
+      claimId: undefined,
       processingStartedAt: undefined,
     });
   },
@@ -531,6 +536,7 @@ export const internalResetTask = internalMutation({
       error: undefined,
       completedAt: undefined,
       resultCount: undefined,
+      claimId: undefined,
       processingStartedAt: undefined,
     });
   },

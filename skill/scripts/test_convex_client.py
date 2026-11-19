@@ -143,7 +143,25 @@ def backend(monkeypatch):
 
 def test_claim_task_returns_a_granted_claim(backend):
     assert convex_client.claim_task("T1") == {"claimed": True}
-    assert backend.calls == [(f"{convex_client.CONVEX_URL}/api/claim-task", {"taskId": "T1"})]
+    [(url, body)] = backend.calls
+    assert url == f"{convex_client.CONVEX_URL}/api/claim-task"
+    assert body["taskId"] == "T1"
+
+
+def test_claim_retry_reuses_its_id_but_another_run_gets_a_new_one(monkeypatch):
+    attempts = []
+
+    def post(url, *, json, **kwargs):
+        attempts.append(json.get("claimId"))
+        if len(attempts) == 1:
+            raise requests.ReadTimeout("response lost after commit")
+        return _response(200, {"claimed": bool(attempts[0]) and attempts[-1] == attempts[0]})
+
+    monkeypatch.setattr(convex_client.requests, "post", post)
+    monkeypatch.setattr(convex_client.time, "sleep", lambda _: None)
+    assert convex_client.claim_task("T1") == {"claimed": True}
+    assert convex_client.claim_task("T1") == {"claimed": False}
+    assert len(attempts) == 3
 
 
 def test_claim_task_returns_a_refused_claim_with_the_current_status(backend):

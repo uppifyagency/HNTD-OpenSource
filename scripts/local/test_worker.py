@@ -243,11 +243,18 @@ def backend(fake_claude, tmp_path, monkeypatch):
     class Backend:
         error = http_error(404)
         updates = []
+        claims = []
+
+        @staticmethod
+        def claim_task(task_id):
+            Backend.claims.append(task_id)
+            return {"claimed": True}
 
         @staticmethod
         def get_task(task_id):
             raise Backend.error
 
+    monkeypatch.setattr(worker.convex_client, "claim_task", Backend.claim_task)
     monkeypatch.setattr(worker.convex_client, "get_task", Backend.get_task)
     monkeypatch.setattr(worker.convex_client, "update_task_status",
                         lambda task_id, status, error=None: Backend.updates.append((task_id, status)))
@@ -255,9 +262,10 @@ def backend(fake_claude, tmp_path, monkeypatch):
 
 
 def test_a_search_deleted_during_its_run_counts_as_finished(backend):
-    worker.process("t1", {"ok": True})
+    assert worker.process("t1", {"ok": True}) is True
     assert not worker.INFLIGHT.exists()
-    assert backend.updates == [("t1", "processing")]
+    assert backend.claims == ["t1"]
+    assert backend.updates == []
 
 
 def test_a_crashed_run_of_a_deleted_search_is_cleared(backend):
