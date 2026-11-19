@@ -191,7 +191,8 @@ cmd_seed_results() {
     || { echo "task $task not found"; exit 1; }
   mkdir -p skill/output
   for pair in golden_fetch:fetch-$task golden_scores:score-$task-batch-0 golden_normalized:normalized-$task \
-              golden_deterministic:deterministic-rank-$task golden_prefilter:prefilter-$task; do
+              golden_deterministic:deterministic-rank-$task golden_prefilter:prefilter-$task \
+              golden_graphql:graphql-$task; do
     src=$FIXTURES/${pair%%:*}.json; dst=skill/output/${pair##*:}.json
     cp "$src" "$dst"; echo "$dst" >> "$SEEDED"
   done
