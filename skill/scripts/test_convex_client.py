@@ -106,3 +106,81 @@ def test_reconstruct_jd_profile_file_returns_none_without_profile(tmp_path, monk
     monkeypatch.setattr(convex_client, "get_task", lambda tid: {})
     assert convex_client.reconstruct_jd_profile_file("T4", str(tmp_path)) is None
     assert not list(Path(tmp_path).glob("*.json"))
+
+
+# Issue #3: a search is taken by one compare-and-set claim, pending -> processing. The backend
+# answers are faked at requests.post; nothing reaches a network.
+
+import pytest  # noqa: E402
+import requests  # noqa: E402
+
+
+def _response(status: int, body: dict) -> requests.Response:
+    resp = requests.Response()
+    resp.status_code = status
+    resp._content = json.dumps(body).encode()
+    resp.url = f"{convex_client.CONVEX_URL}/api/claim-task"
+    return resp
+
+
+@pytest.fixture
+def backend(monkeypatch):
+    """POST answers the claim route gives, faked. Set `backend.answer = (status, body)`.
+    `backend.calls` lists every (url, json) the client sent."""
+    class Backend:
+        answer = (200, {"claimed": True})
+        calls = []
+
+    def post(url, **kwargs):
+        Backend.calls.append((url, kwargs.get("json")))
+        return _response(*Backend.answer)
+
+    monkeypatch.setattr(convex_client.requests, "post", post)
+    monkeypatch.delenv("HNTD_CLAIMED_TASK", raising=False)
+    Backend.calls = []
+    return Backend
+
+
+def test_claim_task_returns_a_granted_claim(backend):
+    assert convex_client.claim_task("T1") == {"claimed": True}
+    assert backend.calls == [(f"{convex_client.CONVEX_URL}/api/claim-task", {"taskId": "T1"})]
+
+
+def test_claim_task_returns_a_refused_claim_with_the_current_status(backend):
+    backend.answer = (200, {"claimed": False, "status": "processing"})
+    assert convex_client.claim_task("T1") == {"claimed": False, "status": "processing"}
+
+
+def test_claim_task_raises_task_not_found_on_404(backend):
+    backend.answer = (404, {"error": "Task not found", "code": "task_not_found"})
+    with pytest.raises(convex_client.TaskNotFound):
+        convex_client.claim_task("T1")
+
+
+def test_claim_command_trusts_the_workers_claim_without_asking_the_backend(backend, monkeypatch, capsys):
+    monkeypatch.setenv("HNTD_CLAIMED_TASK", "T1")
+    assert convex_client.claim_command("T1") == 0
+    assert backend.calls == []
+    assert "worker already holds the claim" in capsys.readouterr().out
+
+
+def test_claim_command_claims_a_task_the_worker_does_not_hold(backend, monkeypatch, capsys):
+    monkeypatch.setenv("HNTD_CLAIMED_TASK", "OTHER")
+    assert convex_client.claim_command("T1") == 0
+    assert len(backend.calls) == 1
+    assert "claimed" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("status", ["processing", "completed", "failed"])
+def test_claim_command_refused_names_the_status_and_the_reset(backend, capsys, status):
+    backend.answer = (200, {"claimed": False, "status": status})
+    assert convex_client.claim_command("T1") == 3
+    out = capsys.readouterr().out
+    assert status in out
+    assert "/github-hr reset T1" in out
+
+
+def test_claim_command_on_a_missing_task_exits_4(backend, capsys):
+    backend.answer = (404, {"error": "Task not found", "code": "task_not_found"})
+    assert convex_client.claim_command("T1") == 4
+    assert "not found" in capsys.readouterr().out
