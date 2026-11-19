@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { checkStatusTransition, type TaskStatus } from "../../../convex/taskTransitions";
+import {
+  SETTABLE_STATUSES,
+  checkStatusTransition,
+  type TaskStatus,
+} from "../../../convex/taskTransitions";
 
 // Every from/to pair with the verdict the server must give. Editing the table in
 // convex/taskTransitions.ts without editing this one fails the suite.
@@ -25,5 +29,13 @@ describe("checkStatusTransition", () => {
     const verdict = checkStatusTransition(from, to);
     expect(verdict.allowed).toBe(allowed);
     if (!verdict.allowed) expect(verdict.reason).not.toBe("");
+  });
+});
+
+// Issues #1 and #4: only `tasks.completeTask` may complete a search, in the same transaction
+// that stores its result list. The generic status setter never writes `completed`.
+describe("SETTABLE_STATUSES", () => {
+  it("is exactly pending, processing and failed", () => {
+    expect([...SETTABLE_STATUSES].sort()).toEqual(["failed", "pending", "processing"]);
   });
 });
