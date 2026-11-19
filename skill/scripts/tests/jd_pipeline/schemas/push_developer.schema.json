@@ -26,7 +26,29 @@
     "poolCategory": {"type": "string"},
     "jdScoreBreakdown": {"type": "object"},
     "jdAssessment": {"type": "string"},
+    "repositoriesContributedTo": {"type": "array", "items": {"type": "string"}},
+    "organizations": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["login"],
+      "properties": {"login": {"type": "string"}, "name": {"type": "string"}}}},
+    "pinnedRepos": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["name"],
+      "properties": {"name": {"type": "string"}, "primaryLanguage": {"type": "string"}, "stars": {"type": "number"},
+                     "forks": {"type": "number"}, "description": {"type": "string"}}}},
+    "socialAccounts": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["provider", "url"],
+      "properties": {"provider": {"type": "string"}, "url": {"type": "string"}}}},
+    "languageBytes": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["language", "bytes"],
+      "properties": {"language": {"type": "string"}, "bytes": {"type": "number"}}}},
+    "commitsByRepo": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["repo", "contributions"],
+      "properties": {"repo": {"type": "string"}, "contributions": {"type": "number"}}}},
+    "commitsPerRepo": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["repo", "totalCount"],
+      "properties": {"repo": {"type": "string"}, "totalCount": {"type": "number"}}}},
+    "mergedPullRequestsByRepo": {"$ref": "#/$defs/repoCounts"},
+    "releasesByRepo": {"$ref": "#/$defs/repoCounts"},
+    "openIssuesByRepo": {"$ref": "#/$defs/repoCounts"},
+    "watchersByRepo": {"$ref": "#/$defs/repoCounts"},
     "matchConfidence": {"type": "number"},
     "matchReason": {"type": "string"}
+  },
+  "$defs": {
+    "repoCounts": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["repo", "count"],
+      "properties": {"repo": {"type": "string"}, "count": {"type": "number"}}}}
   }
 }

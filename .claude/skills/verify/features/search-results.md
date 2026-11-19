@@ -41,7 +41,6 @@ Preconditions:
 
 - Rows show the candidate's name, not the login. The login is the image's alt text.
 - `seed-results` runs only the push. A green run here says nothing about search, fetch or scoring.
-- `seed-results` leaves out `golden_graphql.json` on purpose. Its `commitsByRepo` entries use `repoName` and `totalCount`, and the backend accepts only `repo` and `contributions`, so every push with that file fails with HTTP 500.
 - `Calibrated` is the default sort and the first click on `Match` keeps Alice first. Click twice to see the order change.
 - Candidate avatars load from GitHub over the network. A broken image is not an app failure.
 - Deleting a search while a pipeline run works on it leaves a result list behind. See [the statechart](../statechart/README.md).

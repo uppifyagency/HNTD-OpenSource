@@ -2,6 +2,8 @@
 import jsonschema
 import pytest
 
+from push_results import transform_developer
+
 
 class TestContract_JdProfile_To_Prefilter:
     def test_languages_non_empty(self, golden_jd_profile):
@@ -152,6 +154,25 @@ class TestContract_Normalized_To_Push:
         for iso in golden_triage["isolated"]:
             all_triage_logins.add(iso["login"])
         assert norm_logins == all_triage_logins
+
+
+class TestContract_GraphQL_To_Push:
+    """Payloads built from the graphql golden data validate against push_developer.schema.json,
+    which copies the per-repo array shapes of the upsertDeveloper validator in convex/developers.ts."""
+
+    @pytest.mark.parametrize("login", [
+        "alice-fullstack", "bob-backend", "carol-junior", "dave-devops", "eve-inactive",
+    ])
+    def test_push_payload_matches_backend_shape(self, login, golden_graphql, golden_fetch,
+                                                schema_push_developer):
+        graphql_data = next(d for d in golden_graphql["developers"] if d["login"] == login)
+        profile = next((p for p in golden_fetch if p["login"] == login), {"login": login})
+        dev = transform_developer(profile, score_data=None, graphql_data=graphql_data)
+        jsonschema.validate(dev, schema_push_developer)
+
+    def test_every_graphql_developer_is_covered(self, golden_graphql):
+        logins = {d["login"] for d in golden_graphql["developers"]}
+        assert logins == {"alice-fullstack", "bob-backend", "carol-junior", "dave-devops", "eve-inactive"}
 
 
 class TestContract_FullChain:
