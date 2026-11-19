@@ -54,7 +54,8 @@ def _get_dev(golden_graphql, login):
 class TestDiscardRulesJD:
     def test_eve_discarded_zero_target_repos(self, golden_graphql):
         eve = _get_dev(golden_graphql, "eve-inactive")
-        reason = apply_discard_rules(eve, min_activity=20)
+        reason = apply_discard_rules(eve, min_activity=20,
+                                     target_languages=["JavaScript", "TypeScript"])
         assert reason == "zero_target_language_repos"
 
     def test_alice_survives(self, golden_graphql):
