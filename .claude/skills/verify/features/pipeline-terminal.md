@@ -42,5 +42,5 @@ Preconditions:
 - `client create` needs the Convex user ID, not the name. The local user row exists only after a browser has opened `/dashboard` once. Before that, `client users` prints `No users found.` `launch` makes that first visit through the printed link.
 - `client` reads `skill/scripts/.env`. `run.sh` rewrites that file on every start, because the backend port can change. The file can hold a `GH_TOKEN`. Never print it.
 - `term-push` proves the push step alone when it runs through `seed-results`.
-- The backend accepts any status change except leaving `completed` for `pending` or `processing`. A second run can mark a completed search failed. See [the statechart](../statechart/README.md).
+- A completed search refuses every status change except `completed` again: `update-task-status` answers HTTP 409 with `code: "invalid_transition"`. Only a reset or a delete takes it out of `completed`. See [the statechart](../statechart/README.md).
 - Run pipeline tests with `skill/scripts/run-tests.sh`, never with a bare `pytest`.

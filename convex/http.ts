@@ -1,4 +1,5 @@
 import { httpRouter } from "convex/server";
+import { ConvexError } from "convex/values";
 import { httpAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -84,6 +85,14 @@ async function requireAuth(request: Request): Promise<Response | null> {
 }
 
 function errorResponse(error: unknown, status = 500): Response {
+  // A status change refused by convex/taskTransitions.ts is a conflict with the task's state,
+  // not a server fault. ctx.runMutation rethrows the mutation's ConvexError with its data.
+  if (error instanceof ConvexError && error.data?.code === "invalid_transition") {
+    return new Response(JSON.stringify(error.data), {
+      status: 409,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   const message = error instanceof Error ? error.message : "Internal server error";
   return new Response(JSON.stringify({ error: message }), {
     status,
@@ -1156,11 +1165,18 @@ http.route({
 
       let recovered = 0;
       for (const task of tasks) {
-        await ctx.runMutation(internal.tasks.updateTaskStatus, {
-          taskId: task._id,
-          status: "pending" as const,
-          error: `Auto-recovered: stuck processing since ${task.processingStartedAt ? new Date(task.processingStartedAt).toISOString() : 'unknown time'}`,
-        });
+        try {
+          await ctx.runMutation(internal.tasks.updateTaskStatus, {
+            taskId: task._id,
+            status: "pending" as const,
+            error: `Auto-recovered: stuck processing since ${task.processingStartedAt ? new Date(task.processingStartedAt).toISOString() : 'unknown time'}`,
+          });
+        } catch (error) {
+          // The search completed between the stale read and this write: nothing to recover,
+          // and the stale searches after it still need their turn.
+          if (error instanceof ConvexError && error.data?.code === "invalid_transition") continue;
+          throw error;
+        }
         await ctx.runMutation(internal.pipelineLogs.insertLog, {
           taskId: task._id as string,
           phase: "watchdog",

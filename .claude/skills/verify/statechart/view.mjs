@@ -42,7 +42,8 @@ export const step = (action, from, to) => {
     case "RunStarts":
       return to.search === "processing" ? "the run starts searching GitHub" : "the run stops, the search is gone";
     case "RunReportsFailure":
-      return to.search === "failed" ? "the run reports a failure" : "the run stops, the search is gone";
+      if (to.search === "failed") return "the run reports a failure";
+      return from.search === "completed" ? "the run's failure is refused" : "the run stops, the search is gone";
     case "RunDies":
       return from.search === "deleted" ? "the run stops, the search is gone" : "the Claude Code session ends mid-run";
     case "RunStoresResults":

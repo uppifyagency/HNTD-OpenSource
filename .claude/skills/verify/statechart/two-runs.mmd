@@ -7,8 +7,8 @@ stateDiagram-v2
     lg1: running
     lg2: done
     lg3: failed
-    lg4: Breaks DeliveredStaysCompleted or OneRunAtATime
-    lg5: Path to the DeliveredStaysCompleted or OneRunAtATime bug
+    lg4: Breaks OneRunAtATime
+    lg5: Path to the OneRunAtATime bug
   }
   class lg0 tan
   class lg1 blue
@@ -27,7 +27,6 @@ stateDiagram-v2
   s8: Completed, shortlist shown
   s9: Processing, two runs at once
   s10: Completed, the other run is still on it
-  s11: Failed after it had completed
   [*] --> s0
   s0 --> s1: you start a search
   s1 --> s2: a run reads the queue
@@ -41,12 +40,10 @@ stateDiagram-v2
   s6 --> s5: a run starts searching GitHub
   s5 --> s8: a run marks it completed
   s7 --> s6: a run reports a failure
-  s7 --> s7: a run stores the shortlist
   s7 --> s9: a run starts searching GitHub
   s7 --> s10: a run marks it completed
   s9 --> s6: a run reports a failure
-  s10 --> s8: the other run finds it completed and stops or a run marks it completed
-  s10 --> s11: a run reports a failure
+  s10 --> s8: the other run's failure is refused or the other run finds it completed and stops or a run marks it completed
   s6 --> s8: a run marks it completed
   s9 --> s10: a run marks it completed
   classDef breaks fill:#ffecee,stroke:#e72e3b,stroke-width:2.5px,color:#cd2834
@@ -68,7 +65,3 @@ stateDiagram-v2
   class s9 breaks
   class s9 bugPath
   class s10 teal
-  class s10 bugPath
-  class s11 orange
-  class s11 breaks
-  class s11 bugPath

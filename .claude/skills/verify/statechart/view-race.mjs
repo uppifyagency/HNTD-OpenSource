@@ -31,7 +31,7 @@ export const step = (action, from, to) => {
     case "RunStarts":
       return to.search === "processing" ? "a run starts searching GitHub" : "the other run finds it completed and stops";
     case "RunReportsFailure":
-      return "a run reports a failure";
+      return to.search === "failed" ? "a run reports a failure" : "the other run's failure is refused";
     case "RunStoresResults":
       return "a run stores the shortlist";
     case "RunMarksCompleted":
