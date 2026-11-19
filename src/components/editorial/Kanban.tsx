@@ -59,15 +59,17 @@ export type KCardProps = {
 
 export function KCard({ href = "#", id, name, stack, score, tone = "default", extra }: KCardProps) {
   return (
-    <a href={href} className="kcard" style={TONE_STYLE[tone]}>
+    <div className="kcard" style={TONE_STYLE[tone]}>
       <div className="kcard__id">{id}</div>
-      <div className="kcard__name">{name}</div>
+      <a href={href} className="kcard__name">
+        {name}
+      </a>
       <div className="kcard__meta">
         <span>{stack}</span>
         <span>·</span>
         <span className="kcard__score">{score}</span>
       </div>
       {extra}
-    </a>
+    </div>
   );
 }

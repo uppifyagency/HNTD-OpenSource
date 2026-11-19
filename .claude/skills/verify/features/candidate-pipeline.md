@@ -28,16 +28,18 @@ Preconditions:
 
 - **Save.** Run `hntd-verify browser --out <dir> goto /dashboard/tasks/<TASK_ID> click 'text="Alice Developer"' url '/dashboard/developer/' click 'role=button[name=/Save to pipeline/]' expect 'role=button[name=/In pipeline/]'`. The button reads `♥ In pipeline`.
 - **See the card.** Add `goto /dashboard/pipeline expect '.kcol:has(.kcol__head:has-text("saved")) >> text="Alice Developer"' aria saved shot saved`. The heading reads `Pipeline. 1 attivi.` and the card offers `→ contacted`, `→ interview`, `✉` and `✕`.
-- **Move to contacted.** Add `click 'role=button[name="→ contacted"]' url '/dashboard/pipeline$' expect '.kcol:has(.kcol__head:has-text("contacted")) >> text="Alice Developer"'`. The card sits in `contacted` and the page is still the pipeline. The `url` step fails today. See `Gotchas`.
-- **Move to interview.** `goto /dashboard/pipeline`, then `click 'role=button[name="→ interview"]'`, `goto /dashboard/pipeline` and `expect '.kcol:has(.kcol__head:has-text("in interview")) >> text="Alice Developer"'`.
-- **Move to pass.** `click 'role=button[name="→ pass"]'`, `goto /dashboard/pipeline` and `expect '.kcol:has(.kcol__head:has-text("pass")) >> text="Alice Developer"'`. The heading reads `Pipeline. 0 attivi.`.
-- **Move back.** `click 'role=button[name="→ saved"]'`, `goto /dashboard/pipeline` and expect the card under `saved`.
-- **Remove.** `click 'role=button[name="✕"]'`, `goto /dashboard/pipeline` and `expect 'text="Pipeline vuota."' aria emptied`.
+- **Move through the columns.** In the same browser call, with no `goto` between moves, add:
+  - `click 'role=button[name="→ contacted"]' url '/dashboard/pipeline$' expect '.kcol:has(.kcol__head:has-text("contacted")) >> text="Alice Developer"'`
+  - `click 'role=button[name="→ interview"]' url '/dashboard/pipeline$' expect '.kcol:has(.kcol__head:has-text("in interview")) >> text="Alice Developer"'`
+  - `click 'role=button[name="→ pass"]' url '/dashboard/pipeline$' expect '.kcol:has(.kcol__head:has-text("pass")) >> text="Alice Developer"'`. The heading reads `Pipeline. 0 attivi.`.
+  - `click 'role=button[name="→ saved"]' url '/dashboard/pipeline$' expect '.kcol:has(.kcol__head:has-text("saved")) >> text="Alice Developer"'`
+
+  Each move keeps the page on the pipeline.
+- **Open the dossier from the card.** Add `click 'role=link[name="Alice Developer"]' url '/dashboard/developer/'`. Only the candidate's name is a link. Then `goto /dashboard/pipeline` to come back.
+- **Remove.** Add `click 'role=button[name="✕"]' url '/dashboard/pipeline$' expect 'text="Pipeline vuota."' aria emptied`.
 
 ## Gotchas
 
-- Known defect: every button on a card also opens the candidate's dossier. The whole card is a link and the buttons sit inside it, so the click moves the card and then leaves the page. The move is saved. Until this is fixed, `goto /dashboard/pipeline` after each click to see the result, and report the failed `url` step.
-- The same nesting puts the `✉` link inside the card link. The browser console logs a hydration error for it on every load.
 - A column header and its count are separate elements. `text=/contacted 1/` never matches. Use the `.kcol:has(...)` selector.
 - A card in `pass` does not count as active, so the heading can read `0 attivi` with one card on the board.
 - CSV and PDF export here were not driven. Use `download` as in [Search results](./search-results.md).

@@ -535,7 +535,6 @@
   position: relative; border: var(--hair) solid var(--rule-2); padding: 10px 12px 10px 22px;
   font-family: var(--font-geist-mono), monospace; font-size: var(--t-12); background: var(--paper);
   transition: border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
-  cursor: grab; text-decoration: none; display: block;
 }
 .skin-editorial .kcard::before {
   content: "⋮⋮"; position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
@@ -544,9 +543,9 @@
 }
 .skin-editorial .kcard:hover { border-color: var(--ink); transform: translateY(-1px); background: var(--paper-2); }
 .skin-editorial .kcard:hover::before { color: var(--ink); }
-.skin-editorial .kcard:active { cursor: grabbing; }
 .skin-editorial .kcard__id { color: var(--dim); }
-.skin-editorial .kcard__name { color: var(--ink); font-size: var(--t-13); margin: 4px 0 2px; }
+.skin-editorial .kcard__name { display: block; width: fit-content; color: var(--ink); text-decoration: none; font-size: var(--t-13); margin: 4px 0 2px; }
+.skin-editorial .kcard__name:hover { text-decoration: underline; text-underline-offset: 3px; }
 .skin-editorial .kcard__meta { color: var(--dim); display: flex; gap: 8px; flex-wrap: wrap; }
 .skin-editorial .kcard__score { color: var(--ed-accent); font-variant-numeric: tabular-nums; }
 @media (max-width: 768px) { .skin-editorial .kanban { grid-template-columns: 1fr; } }
