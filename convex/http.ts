@@ -320,6 +320,41 @@ http.route({
   }),
 });
 
+// POST /api/claim-task — the pipeline takes a pending search before working on it (issue #3)
+http.route({
+  path: "/api/claim-task",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const authErr = await requireAuth(request);
+    if (authErr) return authErr;
+
+    try {
+      const { taskId } = await request.json();
+      if (!taskId || typeof taskId !== "string") {
+        return new Response(JSON.stringify({ error: "taskId is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const claim = await ctx.runMutation(internal.tasks.claimTask, { taskId: taskId as Id<"tasks"> });
+      if (claim.outcome === "task_not_found") {
+        return new Response(JSON.stringify({ error: "Task not found", code: "task_not_found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const body = claim.outcome === "claimed" ? { claimed: true } : { claimed: false, status: claim.status };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      return errorResponse(error);
+    }
+  }),
+});
+
 // POST /api/update-task-status — Python script updates task status
 http.route({
   path: "/api/update-task-status",

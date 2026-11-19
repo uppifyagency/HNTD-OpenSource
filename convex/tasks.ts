@@ -164,7 +164,7 @@ function truncateError(error: string | undefined) {
   return error && error.length > 2000 ? error.slice(0, 2000) + "... [truncated]" : error;
 }
 
-// Sets any status but `completed`; only `completeTask` completes a search.
+// Sets `pending` or `failed`; only `claimTask` starts a search and only `completeTask` completes one.
 export const updateTaskStatus = internalMutation({
   args: {
     taskId: v.id("tasks"),
@@ -177,15 +177,41 @@ export const updateTaskStatus = internalMutation({
     assertTransition(task.status, args.status);
 
     const updates: Record<string, unknown> = { status: args.status };
-    if (args.status === "processing") {
-      updates.processingStartedAt = Date.now();
-    }
     if (args.status === "failed") {
       updates.processingStartedAt = undefined;
     }
     const errorMsg = truncateError(args.error);
     if (errorMsg) updates.error = errorMsg;
     await ctx.db.patch(args.taskId, updates);
+  },
+});
+
+// Takes a search for one run: compare-and-set from `pending` to `processing` in one transaction,
+// so of two runs that claim the same search only one is granted it (#3). A refusal is an
+// expected answer, not an error: the caller leaves the search alone.
+export const claimTask = internalMutation({
+  args: { taskId: v.id("tasks") },
+  returns: v.union(
+    v.object({ outcome: v.literal("claimed") }),
+    v.object({
+      outcome: v.literal("refused"),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("processing"),
+        v.literal("completed"),
+        v.literal("failed")
+      ),
+    }),
+    v.object({ outcome: v.literal("task_not_found") })
+  ),
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) return { outcome: "task_not_found" as const };
+    if (!checkStatusTransition(task.status, "processing").allowed) {
+      return { outcome: "refused" as const, status: task.status };
+    }
+    await ctx.db.patch(args.taskId, { status: "processing", processingStartedAt: Date.now() });
+    return { outcome: "claimed" as const };
   },
 });
 

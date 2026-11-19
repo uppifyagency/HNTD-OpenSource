@@ -94,8 +94,49 @@ def complete_task(task_id: str, developer_ids: list[str], error: str = None):
     return resp.json()
 
 
+def claim_task(task_id: str) -> dict:
+    """Take a pending task for this run: pending -> processing, one compare-and-set on the backend.
+
+    Returns {"claimed": True}, or {"claimed": False, "status": <current status>} when the task is
+    not pending (another run holds it, or it is finished). Raises TaskNotFound when it is gone.
+    """
+    try:
+        resp = _request_with_retry(requests.post, f"{CONVEX_URL}/api/claim-task",
+                                   json={"taskId": task_id})
+    except requests.exceptions.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 404:
+            raise TaskNotFound(task_id) from exc
+        raise
+    return resp.json()
+
+
+CLAIMED_BY_WORKER_ENV = "HNTD_CLAIMED_TASK"  # set by scripts/local/worker.py for the run it starts
+
+
+def claim_command(task_id: str) -> int:
+    """`convex_client.py claim <TASK_ID>`: may this run work on the task? Exit 0 yes, 3 refused,
+    4 not found. The local worker claims before it starts the run and names the task in
+    HNTD_CLAIMED_TASK; that run's own claim would be refused, so it is not sent."""
+    if os.environ.get(CLAIMED_BY_WORKER_ENV) == task_id:
+        print(f"Task {task_id}: the local worker already holds the claim.")
+        return 0
+    try:
+        claim = claim_task(task_id)
+    except TaskNotFound:
+        print(f"Task {task_id} not found.")
+        return 4
+    if claim.get("claimed"):
+        print(f"Task {task_id} claimed: pending -> processing.")
+        return 0
+    status = claim.get("status")
+    print(f"Task {task_id} not claimed: it is {status}, and only a pending task can be claimed.")
+    if status in ("processing", "completed", "failed"):
+        print(f"If no other run is working on it, run /github-hr reset {task_id} first.")
+    return 3
+
+
 def update_task_status(task_id: str, status: str, error: str = None):
-    """Update a task's status."""
+    """Set a task to pending or failed. claim_task starts a task, complete_task completes it."""
     body = {"taskId": task_id, "status": status}
     if error:
         body["error"] = error
@@ -421,6 +462,11 @@ if __name__ == "__main__":
         completed = sum(1 for j in matched if j["status"] == "completed")
         failed = sum(1 for j in matched if j["status"] == "failed")
         print(f"\nTotal: {len(matched)} tasks ({pending} pending, {completed} completed, {failed} failed)")
+    elif cmd == "claim":
+        if len(sys.argv) < 3:
+            print("Usage: convex_client.py claim <TASK_ID>")
+            sys.exit(1)
+        sys.exit(claim_command(sys.argv[2]))
     elif cmd == "reset":
         if len(sys.argv) < 3:
             print("Usage: convex_client.py reset <TASK_ID>")
@@ -491,5 +537,5 @@ if __name__ == "__main__":
         print(f"Recovered {result.get('recovered', 0)} of {result.get('total', 0)} stale tasks (threshold: {threshold}min)")
     else:
         print(f"Unknown command: {cmd}")
-        print("Available: pending, priority, task, jobs, users, tasks, reset, delete, results, create, recover")
+        print("Available: pending, priority, task, claim, jobs, users, tasks, reset, delete, results, create, recover")
         sys.exit(1)

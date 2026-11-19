@@ -58,6 +58,8 @@ OPERATIONS
 ### /github-hr run --task \<TASK_ID\>
 Process a single specific task. **Recommended** — keeps the agent session focused on one task.
 Load and follow `skill/skills/github-hr-run/SKILL.md` exactly.
+A task that is not `pending` is refused: its claim fails. If no other run is working on it, run
+`/github-hr reset <TASK_ID>` first.
 
 ### /github-hr run [--priority-only]
 Process all pending (or priority-only) tasks. Load and follow `skill/skills/github-hr-run/SKILL.md`.
