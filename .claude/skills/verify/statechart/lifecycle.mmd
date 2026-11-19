@@ -17,38 +17,33 @@ stateDiagram-v2
   s0: No search yet
   s1: In queue
   s2: Deleted
-  s3: In queue, the pipeline is preparing
-  s4: Deleted, the pipeline still works on it
-  s5: Failed
-  s6: Processing
-  s7: Completed, shortlist shown
-  s8: In queue, a run still works on it
-  s9: Processing, no pipeline run alive
+  s3: Processing
+  s4: Completed, shortlist shown
+  s5: Deleted, the pipeline still works on it
+  s6: Failed
+  s7: In queue, a run still works on it
+  s8: Processing, no pipeline run alive
   [*] --> s0
   s0 --> s1: you start a search
-  s1 --> s3: a pipeline run reads the queue
-  s3 --> s1: the Claude Code session ends mid-run
-  s3 --> s5: the run reports a failure
-  s3 --> s6: the run starts searching GitHub
-  s4 --> s2: the run stops, the search is gone
-  s5 --> s1: you reset it from the terminal
-  s6 --> s5: the run reports a failure
-  s6 --> s7: the run delivers the shortlist
-  s6 --> s4: you delete the search
-  s6 --> s8: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
-  s6 --> s9: the Claude Code session ends mid-run
-  s7 --> s1: you reset it from the terminal
-  s8 --> s1: the Claude Code session ends mid-run
-  s8 --> s5: the run reports a failure
-  s8 --> s7: the run delivers the shortlist
-  s9 --> s1: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
+  s1 --> s3: a pipeline run claims it
+  s3 --> s4: the run delivers the shortlist
+  s3 --> s5: you delete the search
+  s3 --> s6: the run reports a failure
+  s3 --> s7: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
+  s3 --> s8: the Claude Code session ends mid-run
+  s4 --> s1: you reset it from the terminal
+  s5 --> s2: the run stops, the search is gone
+  s6 --> s1: you reset it from the terminal
+  s7 --> s1: the Claude Code session ends mid-run
+  s7 --> s4: the run delivers the shortlist
+  s7 --> s6: the run reports a failure
+  s8 --> s1: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
   class s0 tan
   class s1 tan
   class s2 purple
-  class s3 tan
-  class s4 purple
-  class s5 orange
-  class s6 blue
-  class s7 teal
-  class s8 tan
-  class s9 blue
+  class s3 blue
+  class s4 teal
+  class s5 purple
+  class s6 orange
+  class s7 tan
+  class s8 blue

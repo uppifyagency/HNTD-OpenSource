@@ -9,11 +9,13 @@ import {
 // convex/taskTransitions.ts without editing this one fails the suite.
 // Issue #2: a completed search was flipped to `failed` by a late pipeline write, which hid its
 // shortlist. From `completed`, only `completed` (a retried complete-task) passes.
+// Issue #3: two runs worked on the same search. `processing` is reached only by the claim, from
+// `pending`; a search already processing or failed needs a reset to pending first.
 const EXPECTED: Record<TaskStatus, Record<TaskStatus, boolean>> = {
   pending: { pending: true, processing: true, completed: true, failed: true },
-  processing: { pending: true, processing: true, completed: true, failed: true },
+  processing: { pending: true, processing: false, completed: true, failed: true },
   completed: { pending: false, processing: false, completed: true, failed: false },
-  failed: { pending: true, processing: true, completed: true, failed: true },
+  failed: { pending: true, processing: false, completed: true, failed: true },
 };
 
 const pairs = (Object.keys(EXPECTED) as TaskStatus[]).flatMap((from) =>
@@ -33,9 +35,18 @@ describe("checkStatusTransition", () => {
 });
 
 // Issues #1 and #4: only `tasks.completeTask` may complete a search, in the same transaction
-// that stores its result list. The generic status setter never writes `completed`.
+// that stores its result list. Issue #3: only `tasks.claimTask` may start one. The generic status
+// setter writes neither `completed` nor `processing`.
 describe("SETTABLE_STATUSES", () => {
-  it("is exactly pending, processing and failed", () => {
-    expect([...SETTABLE_STATUSES].sort()).toEqual(["failed", "pending", "processing"]);
+  it("is exactly pending and failed", () => {
+    expect([...SETTABLE_STATUSES].sort()).toEqual(["failed", "pending"]);
+  });
+});
+
+describe("a refused move to processing", () => {
+  it.each(["processing", "failed"] as const)("from %s names the reset", (from) => {
+    const verdict = checkStatusTransition(from, "processing");
+    expect(verdict.allowed).toBe(false);
+    if (!verdict.allowed) expect(verdict.reason).toMatch(/reset/);
   });
 });

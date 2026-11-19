@@ -55,6 +55,8 @@ Before starting, check for a checkpoint file from a previous interrupted run:
 Read `skill/output/checkpoint-{TASK_ID}.json` (if it exists).
 
 If the checkpoint file exists:
+- First run Phase 1's claim for the task. A refused claim stops the resume like any other
+  refused claim, before you touch the checkpoint: another run may own it.
 - Parse it: `{ taskId, lastCompletedPhase, timestamp, pass, metadata }`
 - Log: `"Resuming task {TASK_ID} from phase {next_phase} (last completed: {lastCompletedPhase})"`
 - Validate that expected output files for completed phases still exist
@@ -112,6 +114,15 @@ python skill/scripts/convex_client.py pending
 ```
 
 If no pending tasks, print "No pending tasks." and exit.
+
+**Claim the task** before any other work on it (the pipeline log below, Phase 2, a resume):
+```bash
+python skill/scripts/convex_client.py claim <TASK_ID>
+```
+- Exit 0: this run holds the task. Go on.
+- Any other exit: another run holds the task, or it is not pending, or it is gone. Do NOT work
+  on it and do NOT mark it failed. With `--task`, print the command's output and stop. In queue
+  mode, go to the next task.
 
 Parse the task JSON. Set `mode = task.mode` ("jd" or "manual").
 
@@ -271,14 +282,6 @@ log_pipeline_event('<TASK_ID>', '3.0', 'Strategies generated: <len(searchStrateg
 ```
 
 ### Phase 3.1: Search (SCRIPT — replaces searcher agent)
-
-Update task status to "processing":
-```bash
-python -c "
-from skill.scripts.convex_client import update_task_status
-update_task_status('<TASK_ID>', 'processing')
-"
-```
 
 Determine the search output file name based on pass number:
 - Pass 1 (or unset): `search-<TASK_ID>.json`

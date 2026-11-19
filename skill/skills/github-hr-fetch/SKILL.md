@@ -35,16 +35,17 @@ else: print('Task not found or not pending')
 "
 ```
 
-If the task is not found in pending, try fetching it directly — it may be in `processing` state (crashed recovery).
+If the task is not found in pending, it is not claimable. A task left in `processing` by a
+crashed run needs `/github-hr reset <TASK_ID>` first, and only if no other run is working on it.
 
-### Step 2: Update status to "processing"
+### Step 2: Claim the task
 
 ```bash
-python -c "
-from skill.scripts.convex_client import update_task_status
-update_task_status('<TASK_ID>', 'processing')
-"
+python skill/scripts/convex_client.py claim <TASK_ID>
 ```
+- Exit 0: this run holds the task. Go on.
+- Any other exit: another run holds the task, or it is not pending, or it is gone. Do NOT work
+  on it and do NOT mark it failed. Print the command's output and stop.
 
 ### Step 3: Check if fetch already exists
 

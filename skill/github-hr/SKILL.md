@@ -58,6 +58,8 @@ OPERATIONS
 ### /github-hr run --task \<TASK_ID\>
 Process a single specific task. **Recommended** — keeps the agent session focused on one task.
 Load and follow `skill/skills/github-hr-run/SKILL.md` exactly.
+A task that is not `pending` is refused: its claim fails. If no other run is working on it, run
+`/github-hr reset <TASK_ID>` first.
 
 ### /github-hr run [--priority-only]
 Process all pending (or priority-only) tasks. Load and follow `skill/skills/github-hr-run/SKILL.md`.
@@ -69,6 +71,8 @@ Parse JD into JD Profile (Phase 2 standalone). Load and follow `skill/skills/git
 ### /github-hr fetch <TASK_ID>
 Fetch-only for a single task (Phase 1-3). Load and follow `skill/skills/github-hr-fetch/SKILL.md`.
 Use for manual recovery or debugging. Produces `skill/output/fetch-<TASK_ID>.json`.
+It claims the task and leaves it `processing`: run `/github-hr reset <TASK_ID>` before a later
+`/github-hr run --task <TASK_ID>` (the reset keeps the files under `skill/output/`).
 
 ### /github-hr score <TASK_ID>
 Score-only for a single task (Phase 4). Load and follow `skill/skills/github-hr-score/SKILL.md`.

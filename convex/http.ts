@@ -320,6 +320,48 @@ http.route({
   }),
 });
 
+// POST /api/claim-task: a pipeline run takes a pending search before it works on it
+http.route({
+  path: "/api/claim-task",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const authErr = await requireAuth(request);
+    if (authErr) return authErr;
+
+    try {
+      const { taskId, claimId } = await request.json();
+      if (!taskId || typeof taskId !== "string") {
+        return new Response(JSON.stringify({ error: "taskId is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (claimId !== undefined && (typeof claimId !== "string" || !claimId.trim() || claimId.length > 128)) {
+        return Response.json({ error: "claimId must be a non-empty string of at most 128 characters" }, { status: 400 });
+      }
+
+      const claim = await ctx.runMutation(internal.tasks.claimTask, {
+        taskId: taskId as Id<"tasks">,
+        claimId,
+      });
+      if (claim.outcome === "task_not_found") {
+        return new Response(JSON.stringify({ error: "Task not found", code: "task_not_found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const body = claim.outcome === "claimed" ? { claimed: true } : { claimed: false, status: claim.status };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      return errorResponse(error);
+    }
+  }),
+});
+
 // POST /api/update-task-status — Python script updates task status
 http.route({
   path: "/api/update-task-status",

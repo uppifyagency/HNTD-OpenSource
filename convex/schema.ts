@@ -108,6 +108,7 @@ export default defineSchema({
     error: v.optional(v.string()),
     createdAt: v.number(),
     priority: v.optional(v.boolean()),
+    claimId: v.optional(v.string()),
     processingStartedAt: v.optional(v.number()),
     jdConfirmed: v.optional(v.boolean()),
   })

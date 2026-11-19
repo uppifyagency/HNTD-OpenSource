@@ -10,7 +10,7 @@ VARIABLES
   search,     \* what the dashboard shows: none, pending, processing, completed, failed, deleted
   snapshots,  \* stored result lists for this search (rows in taskResults); 2 means two or more
   delivered,  \* a shortlist was delivered and you have not reset or deleted the search since
-  run         \* each run: idle, loaded (read the queue), working (marked processing)
+  run         \* each run: idle, or working (it holds the claim on the search)
 
 vars == <<search, snapshots, delivered, run>>
 
@@ -46,31 +46,26 @@ YouReset ==
   /\ delivered' = FALSE
   /\ UNCHANGED run
 
-\* Phase 1: the run reads the pending queue. Nothing is written, so the search still looks queued.
-RunLoads(r) ==
+\* claim-task: tasks.claimTask takes the search with one compare-and-set, pending to
+\* processing. The worker claims when it picks a search, a run started by hand in phase 1.
+\* A run that does not get the claim does not work on the search.
+RunClaims(r) ==
   /\ run[r] = "idle"
   /\ search = "pending"
-  /\ Set(r, "loaded")
-  /\ UNCHANGED <<search, snapshots, delivered>>
-
-\* Phase 3.1: update-task-status(processing). convex/taskTransitions.ts refuses it from completed.
-RunStarts(r) ==
-  /\ run[r] = "loaded"
-  /\ IF search \in {"pending", "processing", "failed"}
-       THEN search' = "processing" /\ Set(r, "working")
-       ELSE search' = search /\ Set(r, "idle")
+  /\ search' = "processing"
+  /\ Set(r, "working")
   /\ UNCHANGED <<snapshots, delivered>>
 
 \* Any phase: update-task-status(failed). convex/taskTransitions.ts refuses it from completed.
 RunReportsFailure(r) ==
-  /\ run[r] \in {"loaded", "working"}
+  /\ run[r] = "working"
   /\ Set(r, "idle")
   /\ search' = IF search \in {"pending", "processing", "failed"} THEN "failed" ELSE search
   /\ UNCHANGED <<snapshots, delivered>>
 
 \* The Claude Code session ends without a word.
 RunDies(r) ==
-  /\ run[r] \in {"loaded", "working"}
+  /\ run[r] = "working"
   /\ Set(r, "idle")
   /\ UNCHANGED <<search, snapshots, delivered>>
 
@@ -99,7 +94,7 @@ Done ==
 Next ==
   \/ YouCreate \/ YouDelete \/ YouReset \/ WatchdogRequeues \/ Done
   \/ \E r \in Runs :
-       \/ RunLoads(r) \/ RunStarts(r) \/ RunReportsFailure(r) \/ RunDies(r)
+       \/ RunClaims(r) \/ RunReportsFailure(r) \/ RunDies(r)
        \/ RunCompletes(r)
 
 \* The same pipeline with nobody at the keyboard, no watchdog and no session that dies: you
@@ -113,7 +108,7 @@ Quiet ==
 NextRace ==
   \/ YouCreate \/ Quiet
   \/ \E r \in Runs :
-       \/ RunLoads(r) \/ RunStarts(r) \/ RunReportsFailure(r) \/ RunCompletes(r)
+       \/ RunClaims(r) \/ RunReportsFailure(r) \/ RunCompletes(r)
 
 Spec == Init /\ [][Next]_vars
 

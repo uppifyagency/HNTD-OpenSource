@@ -15,10 +15,16 @@ Source [`lifecycle.mmd`](lifecycle.mmd), report [`lifecycle.report.md`](lifecycl
 ![Lifecycle of one search](lifecycle.svg)
 
 **Two pipeline runs on one search** (`race.cfg`, `view-race.mjs`): you start the search and walk
-away, and two runs pick it up.
+away, and two runs want it. One gets the claim.
 Source [`two-runs.mmd`](two-runs.mmd), report [`two-runs.report.md`](two-runs.report.md).
 
 ![Two runs on one search](two-runs.svg)
+
+**Two runs and the watchdog** (`watchdog.cfg`, `view.mjs`): every action enabled. This is the one
+configuration where a rule still breaks.
+Source [`watchdog.mmd`](watchdog.mmd), report [`watchdog.report.md`](watchdog.report.md).
+
+![Two runs and the watchdog](watchdog.svg)
 
 A red state breaks a rule. A blue border marks the shortest path to it. The lifecycle chart has
 no red state left: with one run, every rule holds.
@@ -30,7 +36,7 @@ no red state left: with one run, every rule holds.
 | `NoResultsForDeletedSearch` | A deleted search leaves no shortlist behind. | Holds since `tasks.completeTask` |
 | `CompletedHasResults` | A search shown as completed has a shortlist. | Holds since `tasks.completeTask` |
 | `DeliveredStaysCompleted` | Once a shortlist is delivered, the search stays completed until you reset or delete it. | Holds since the transition table (`convex/taskTransitions.ts`) |
-| `OneRunAtATime` | At most one pipeline run works on a search. | Breaks with two runs |
+| `OneRunAtATime` | At most one pipeline run works on a search. | Holds since `tasks.claimTask`, except after a requeue or a reset of a search whose run is alive (issue #18) |
 | `NoDeadlock` | No state is a dead end, apart from a deleted search. | Holds |
 
 ## The four breaks, and which are fixed
@@ -41,8 +47,8 @@ again at `eb9d2b0` (`replay.txt` under `test-results/verify/`, a local folder).
 The model describes the backend, which accepts these writes from any pipeline run. Since
 `eb9d2b0` the local worker (`scripts/local/worker.py`) marks a search `processing` when it picks
 it and marks an unfinished one `failed` when its run ends, so in local mode the state
-`Processing, no pipeline run alive` lasts only until the worker notices. The model does not
-have the worker as an actor yet.
+`Processing, no pipeline run alive` lasts only until the worker notices. In the model the
+worker and a run started by hand are the same actor: whoever holds the claim.
 
 1. **A deleted search leaves a shortlist behind.** Fixed. `complete-task` used to store the
    result list without checking that the search existed, then fail on the status write.
@@ -56,19 +62,24 @@ have the worker as an actor yet.
    `convex/taskTransitions.ts` now refuses every change out of `completed` except `completed`
    itself, and the late write gets HTTP 409. The model has the same rule and TLC lists
    `DeliveredStaysCompleted` under "Rules that hold".
-4. **Two runs on one search.** A run reads the queue in phase 1 and marks the search processing
-   only in phase 3.1, after JD parsing and strategy generation. Until then the search still
-   looks queued, so a second `/github-hr run` reads it too. The second `processing` write is
-   accepted. Replay: `race.txt`. In the model both runs then search and score the same search.
+4. **Two runs on one search.** Fixed for the queue. A run used to read the queue and mark the
+   search processing much later, and a second `processing` write was accepted. `tasks.claimTask`
+   now takes the search with one compare-and-set, `pending` to `processing`, and
+   `update-task-status` can no longer set `processing` (HTTP 400). The worker claims when it
+   picks a search and tells its run through `HNTD_CLAIMED_TASK`; a run started by hand claims
+   in phase 1 and stops when refused.
+
+One break is left, tracked in issue #18. After the watchdog requeues a search (30 minutes in
+`processing`) or someone resets it, the run that held it is still working and a second run can
+claim it. `watchdog.report.md` has the path.
 
 ## What the model leaves out
 
 - One search only. Searches do not interact, apart from the plan quota, which local mode does
   not enforce (the local user is on the unlimited plan).
-- The phases inside a run. A run is idle, has read the queue, works, or has stored its
-  shortlist. JD parsing, pass 2 and scoring batches are not modelled.
+- The phases inside a run. A run is idle or holds the claim. JD parsing, pass 2 and scoring
+  batches are not modelled.
 - The admin page's reset (`tasks.resetTask`), which requeues without deleting the old shortlist.
-- `/github-hr run --task <ID>` on a search that is not in the queue.
 - The priority flag, the candidate pipeline and the talent pool.
 - Time. The watchdog can requeue any processing search, where the real one waits 30 minutes.
 
@@ -77,7 +88,7 @@ have the worker as an actor yet.
 - The lifecycle chart draws `you delete the search` only from `Processing`. You can delete from
   every state, and the other deletes all end in `Deleted`.
 - The two-runs chart has no delete, no reset, no watchdog and no session that dies. Its model
-  (`NextRace`) is a subset of the full one, so each break it shows is a break of the full model.
+  (`NextRace`) is a subset of the full one. The watchdog chart uses the full one.
 - Steps that do not change a label are not drawn, for example a second run reading the queue
   while the first one works.
 
@@ -87,6 +98,7 @@ have the worker as an actor yet.
 STATECHART=<pstack plugin>/skills/statechart/scripts/statechart
 $STATECHART SearchLifecycle.tla --config one-run.cfg --view view.mjs --out /tmp/hntd-lifecycle
 $STATECHART SearchLifecycle.tla --config race.cfg --view view-race.mjs --out /tmp/hntd-two-runs
+$STATECHART SearchLifecycle.tla --config watchdog.cfg --view view.mjs --out /tmp/hntd-watchdog
 ```
 
 `--out` must be a new or empty folder. The command needs `mise`, or `TLA2TOOLS` set to a

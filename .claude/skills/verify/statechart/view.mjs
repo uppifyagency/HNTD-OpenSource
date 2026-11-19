@@ -2,7 +2,6 @@
 const runs = (v) => Object.values(v.run);
 const count = (v, ...states) => runs(v).filter((r) => states.includes(r)).length;
 const working = (v) => count(v, "working");
-const onIt = (v) => count(v, "loaded", "working");
 
 export const title = "HNTD search: from the form to the shortlist";
 
@@ -12,8 +11,7 @@ export const state = (v) => {
     case "none":
       return "No search yet";
     case "pending":
-      if (working(v) > 0) return `In queue, a run still works on it${twice}`;
-      return onIt(v) > 0 ? "In queue, the pipeline is preparing" : "In queue";
+      return working(v) > 0 ? `In queue, a run still works on it${twice}` : "In queue";
     case "processing":
       return working(v) > 0 ? `Processing${twice}` : "Processing, no pipeline run alive";
     case "completed":
@@ -24,7 +22,7 @@ export const state = (v) => {
       return working(v) > 0 ? `Failed, a run still works on it${twice}` : "Failed";
     case "deleted":
       if (v.snapshots > 0) return "Deleted, a shortlist is left behind";
-      return onIt(v) > 0 ? "Deleted, the pipeline still works on it" : "Deleted";
+      return working(v) > 0 ? "Deleted, the pipeline still works on it" : "Deleted";
   }
 };
 
@@ -37,10 +35,8 @@ export const step = (action, from, to) => {
       return working(from) > 0 && from.search === "processing" ? "you delete the search" : null;
     case "YouReset":
       return "you reset it from the terminal";
-    case "RunLoads":
-      return "a pipeline run reads the queue";
-    case "RunStarts":
-      return to.search === "processing" ? "the run starts searching GitHub" : "the run stops, the search is gone";
+    case "RunClaims":
+      return "a pipeline run claims it";
     case "RunReportsFailure":
       if (to.search === "failed") return "the run reports a failure";
       return from.search === "completed" ? "the run's failure is refused" : "the run stops, the search is gone";

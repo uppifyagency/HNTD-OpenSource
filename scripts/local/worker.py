@@ -2,7 +2,8 @@
 
 Started by `npm run local` (scripts/local/run.sh) with the pipeline's venv python. Each loop it
 asks the LOCAL backend for pending tasks, checks that the pipeline can reach GitHub, claims the
-oldest task (status "processing"), and runs `claude -p "/github-hr run --task <id>"` in the repo.
+oldest task (pending -> processing, refused if another run took it first), and runs
+`claude -p "/github-hr run --task <id>"` in the repo with HNTD_CLAIMED_TASK=<id>.
 A run that ends without completing or failing the task is marked failed, so the dashboard never
 shows a search stuck in the queue.
 
@@ -235,7 +236,8 @@ def redact_token(log_path: Path, token: str | None) -> str:
 def run_claude(task_id: str, log_path: Path) -> dict:
     """Run the pipeline for one task. Returns the CLI's final `result` message (or {})."""
     cmd = claude_command(f"/github-hr run --task {task_id}")
-    env = pipeline_env()
+    # The run's own `convex_client.py claim` sees that this worker already holds the task.
+    env = dict(pipeline_env(), **{convex_client.CLAIMED_BY_WORKER_ENV: task_id})
     with log_path.open("w") as out:
         proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=out,
                                 stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
@@ -280,10 +282,20 @@ def recover_inflight() -> None:
     INFLIGHT.unlink()
 
 
-def process(task_id: str, github: dict) -> None:
-    log_path = new_log(task_id)
+def process(task_id: str, github: dict) -> bool:
+    """Claim the task and run it. False when the claim was not granted and nothing ran."""
     write_json(INFLIGHT, {"taskId": task_id, "pid": None})
-    convex_client.update_task_status(task_id, "processing")
+    try:
+        claim = convex_client.claim_task(task_id)
+    except convex_client.TaskNotFound:
+        log(f"{task_id}: not claimed, the search was deleted")
+        INFLIGHT.unlink()
+        return False
+    if not claim.get("claimed"):
+        log(f"{task_id}: not claimed, it is {claim.get('status')}: another run holds it")
+        INFLIGHT.unlink()
+        return False
+    log_path = new_log(task_id)
     write_status("running", github, taskId=task_id, log=str(log_path.relative_to(ROOT)))
     log(f"{task_id}: running claude {' '.join(model_args()) or '(default model)'}, log {log_path}")
     started = time.time()
@@ -295,6 +307,7 @@ def process(task_id: str, github: dict) -> None:
     fail_if_unfinished(task_id, f"La pipeline si e' fermata senza finire: {last[:400]} "
                                 f"(log: {log_path.relative_to(ROOT)})")
     INFLIGHT.unlink()
+    return True
 
 
 def write_status(state: str, github: dict | None, **extra) -> None:
@@ -327,8 +340,8 @@ def main() -> None:
             elif not shutil.which("claude"):
                 write_status("error", github, error="Claude Code (claude) non installato")
             else:
-                process(pending[0]["_id"], github)
-                continue
+                if process(pending[0]["_id"], github):
+                    continue  # more may be waiting; after a refused claim, wait a poll instead
         except Exception as exc:  # the backend restarting, a network blip: report and keep polling
             log(f"error: {exc}")
             write_status("error", github, error=str(exc)[:300])

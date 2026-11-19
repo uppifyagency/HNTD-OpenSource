@@ -1,7 +1,5 @@
 // The reader's words for SearchLifecycle.tla with race.cfg: two pipeline runs, nobody at the keyboard.
-const count = (v, ...states) => Object.values(v.run).filter((r) => states.includes(r)).length;
-const working = (v) => count(v, "working");
-const read = (v) => count(v, "loaded");
+const working = (v) => Object.values(v.run).filter((r) => r === "working").length;
 
 export const title = "HNTD search: two pipeline runs on one search";
 
@@ -10,34 +8,23 @@ export const state = (v) => {
     case "none":
       return "No search yet";
     case "pending":
-      return ["In queue", "In queue, one run read it", "In queue, both runs read it"][read(v)];
+      return "In queue";
     case "processing":
-      if (working(v) > 1) return "Processing, two runs at once";
-      return read(v) > 0 ? "Processing, the other run read it too" : "Processing";
+      return working(v) > 1 ? "Processing, two runs at once" : "Processing, one run holds the claim";
     case "completed":
-      return working(v) + read(v) > 0 ? "Completed, the other run is still on it" : "Completed, shortlist shown";
+      return "Completed, shortlist shown";
     case "failed":
-      if (v.delivered) return "Failed after it had completed";
-      return working(v) + read(v) > 0 ? "Failed, the other run is still on it" : "Failed";
+      return v.delivered ? "Failed after it had completed" : "Failed";
   }
 };
 
-export const step = (action, from, to) => {
-  switch (action) {
-    case "YouCreate":
-      return "you start a search";
-    case "RunLoads":
-      return "a run reads the queue";
-    case "RunStarts":
-      return to.search === "processing" ? "a run starts searching GitHub" : "the other run finds it completed and stops";
-    case "RunReportsFailure":
-      return to.search === "failed" ? "a run reports a failure" : "the other run's failure is refused";
-    case "RunCompletes":
-      return "a run delivers the shortlist";
-    default:
-      return null;
-  }
-};
+export const step = (action) =>
+  ({
+    YouCreate: "you start a search",
+    RunClaims: "one of the two runs claims it, the other is refused",
+    RunReportsFailure: "the run reports a failure",
+    RunCompletes: "the run delivers the shortlist",
+  })[action] ?? null;
 
 export const group = (v) =>
   ({ none: "waiting", pending: "waiting", processing: "running", completed: "done", failed: "failed" })[v.search];

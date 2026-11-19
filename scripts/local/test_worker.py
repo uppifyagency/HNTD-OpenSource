@@ -243,11 +243,18 @@ def backend(fake_claude, tmp_path, monkeypatch):
     class Backend:
         error = http_error(404)
         updates = []
+        claims = []
+
+        @staticmethod
+        def claim_task(task_id):
+            Backend.claims.append(task_id)
+            return {"claimed": True}
 
         @staticmethod
         def get_task(task_id):
             raise Backend.error
 
+    monkeypatch.setattr(worker.convex_client, "claim_task", Backend.claim_task)
     monkeypatch.setattr(worker.convex_client, "get_task", Backend.get_task)
     monkeypatch.setattr(worker.convex_client, "update_task_status",
                         lambda task_id, status, error=None: Backend.updates.append((task_id, status)))
@@ -255,9 +262,10 @@ def backend(fake_claude, tmp_path, monkeypatch):
 
 
 def test_a_search_deleted_during_its_run_counts_as_finished(backend):
-    worker.process("t1", {"ok": True})
+    assert worker.process("t1", {"ok": True}) is True
     assert not worker.INFLIGHT.exists()
-    assert backend.updates == [("t1", "processing")]
+    assert backend.claims == ["t1"]
+    assert backend.updates == []
 
 
 def test_a_crashed_run_of_a_deleted_search_is_cleared(backend):
@@ -301,3 +309,59 @@ def test_final_result_keeps_the_last_result_and_is_empty_without_one():
     first = dict(RESULT, result="first")
     assert worker.final_result(json.dumps(first) + "\n" + json.dumps(RESULT))["result"] == "done"
     assert worker.final_result('{"type":"system"}\n') == {}
+
+
+# Issue #3: the worker works on a search only after its claim (pending -> processing) succeeds.
+
+@pytest.fixture
+def worker_run(tmp_path, monkeypatch):
+    """process() with the backend faked and a `claude` that records the claim it was given.
+    Returns the list of backend status writes and the file claude writes when it starts."""
+    started = tmp_path / "claude-started"
+    bin_dir = tmp_path / "claude-bin"
+    bin_dir.mkdir()
+    claude = bin_dir / "claude"
+    claude.write_text(f'#!/bin/sh\necho "$HNTD_CLAIMED_TASK" > "{started}"\n'
+                      'echo "{\\"type\\": \\"result\\", \\"result\\": \\"done\\"}"\n')
+    claude.chmod(0o755)
+    monkeypatch.setitem(worker.BASE_ENV, "PATH", f"{bin_dir}:/usr/bin:/bin")
+    monkeypatch.setattr(worker, "SKILL_ENV", tmp_path / ".env")
+    monkeypatch.setattr(worker, "LOG_DIR", tmp_path / "pipeline-logs")
+    monkeypatch.setattr(worker, "INFLIGHT", tmp_path / "inflight.json")
+    monkeypatch.setattr(worker, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(worker, "ROOT", tmp_path)
+    monkeypatch.setattr(worker, "WRITABLE", tmp_path / "skill" / "output")
+    writes = []
+    monkeypatch.setattr(worker.convex_client, "update_task_status",
+                        lambda task_id, status, error=None: writes.append((task_id, status)))
+    monkeypatch.setattr(worker.convex_client, "get_task", lambda task_id: {"status": "completed"})
+    return writes, started
+
+
+@pytest.mark.parametrize("answer", [{"claimed": False, "status": "processing"}, "gone"])
+def test_a_refused_claim_starts_no_run_and_marks_nothing(worker_run, monkeypatch, answer):
+    writes, started = worker_run
+
+    def claim_task(task_id):
+        if answer == "gone":
+            raise worker.convex_client.TaskNotFound(task_id)
+        return answer
+
+    monkeypatch.setattr(worker.convex_client, "claim_task", claim_task)
+    assert worker.process("t1", {"ok": True}) is False
+    assert not started.exists()
+    assert not worker.INFLIGHT.exists()
+    assert writes == []
+
+
+def test_a_granted_claim_runs_claude_holding_it(worker_run, monkeypatch):
+    writes, started = worker_run
+    claims = []
+    monkeypatch.setattr(worker.convex_client, "claim_task",
+                        lambda task_id: claims.append(task_id) or {"claimed": True})
+    assert worker.process("t1", {"ok": True}) is True
+    assert claims == ["t1"]
+    assert started.read_text().strip() == "t1"
+    assert not worker.INFLIGHT.exists()
+    assert writes == []
+    assert "HNTD_CLAIMED_TASK" not in worker.pipeline_env()
