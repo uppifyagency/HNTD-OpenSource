@@ -43,4 +43,4 @@ Preconditions:
 - `seed-results` runs only the push. A green run here says nothing about search, fetch or scoring.
 - `Calibrated` is the default sort and the first click on `Match` keeps Alice first. Click twice to see the order change.
 - Candidate avatars load from GitHub over the network. A broken image is not an app failure.
-- Deleting a search while a pipeline run works on it leaves a result list behind. See [the statechart](../statechart/README.md).
+- Deleting a search while a pipeline run works on it costs that run: its push ends with `Search <ID> was deleted while the pipeline ran` and stores nothing.

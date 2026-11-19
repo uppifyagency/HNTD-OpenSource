@@ -1,7 +1,6 @@
 # SearchLifecycle
 
-TLC reached 32 states and 68 steps. The chart draws 11 states and 18 arrows.
-The chart does not draw 12 steps that stay in one chart state.
+TLC reached 21 states and 48 steps. The chart draws 11 states and 18 arrows.
 The view hides 3 steps, so the chart does not draw them.
 
 ## OneRunAtATime breaks
