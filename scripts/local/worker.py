@@ -21,6 +21,8 @@ import sys
 import time
 from pathlib import Path
 
+import requests
+
 ROOT = Path(__file__).resolve().parents[2]
 SKILL_ENV = ROOT / "skill" / "scripts" / ".env"
 STATE_DIR = ROOT / ".convex"
@@ -243,7 +245,15 @@ def run_claude(task_id: str, log_path: Path) -> dict:
 
 
 def fail_if_unfinished(task_id: str, reason: str) -> None:
-    status = convex_client.get_task(task_id).get("status")
+    """Mark the task failed unless it is finished. A deleted search (the backend answers 404)
+    counts as finished. Any other error propagates, so the caller keeps INFLIGHT and retries."""
+    try:
+        status = convex_client.get_task(task_id).get("status")
+    except requests.HTTPError as exc:
+        if exc.response is None or exc.response.status_code != 404:
+            raise
+        log(f"{task_id}: the search was deleted, nothing to mark failed")
+        return
     if status not in FINISHED:
         convex_client.update_task_status(task_id, "failed", reason)
         log(f"{task_id}: {status} -> failed ({reason[:120]})")
