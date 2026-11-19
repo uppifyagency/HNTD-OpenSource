@@ -28,11 +28,11 @@ A red state breaks a rule. A blue border marks the shortest path to it.
 |---|---|---|
 | `NoResultsForDeletedSearch` | A deleted search leaves no shortlist behind. | Breaks with one run |
 | `CompletedHasResults` | A search shown as completed has a shortlist. | Breaks with one run |
-| `DeliveredStaysCompleted` | Once a shortlist is delivered, the search stays completed until you reset or delete it. | Breaks with two runs |
+| `DeliveredStaysCompleted` | Once a shortlist is delivered, the search stays completed until you reset or delete it. | Holds since the transition table (`convex/taskTransitions.ts`) |
 | `OneRunAtATime` | At most one pipeline run works on a search. | Breaks with two runs |
 | `NoDeadlock` | No state is a dead end, apart from a deleted search. | Holds |
 
-## The four breaks
+## The four breaks, and which are fixed
 
 Each path was replayed against the running app on 2026-11-19, first at commit `264045c` and
 again at `eb9d2b0` (`replay.txt` under `test-results/verify/`, a local folder).
@@ -54,11 +54,11 @@ have the worker as an actor yet.
    reads `Sviluppatori trovati: 4` above `Nessuno sviluppatore.` The replay sent the last write
    on its own, because the two writes of `complete-task` cannot be split from outside. Inside
    one request the window is milliseconds, so this one is rare.
-3. **Failed after it had completed.** Two runs read the same queued search. The first delivers
-   the shortlist. The second reports a failure, and the backend accepts `completed` to `failed`
-   (`convex/tasks.ts`, `updateTaskStatus` blocks only `completed` to `pending` or `processing`).
-   Replay: `race.txt` and `failed-after-completed.png`. The dashboard shows the search as failed
-   and hides a shortlist of four that is still stored.
+3. **Failed after it had completed.** Fixed. Two runs read the same queued search, the first
+   delivered the shortlist, and the second reported a failure that the backend accepted.
+   `convex/taskTransitions.ts` now refuses every change out of `completed` except `completed`
+   itself, and the late write gets HTTP 409. The model has the same rule and TLC lists
+   `DeliveredStaysCompleted` under "Rules that hold".
 4. **Two runs on one search.** A run reads the queue in phase 1 and marks the search processing
    only in phase 3.1, after JD parsing and strategy generation. Until then the search still
    looks queued, so a second `/github-hr run` reads it too. The second `processing` write is

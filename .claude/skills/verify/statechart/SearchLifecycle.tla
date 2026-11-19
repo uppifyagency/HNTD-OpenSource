@@ -54,7 +54,7 @@ RunLoads(r) ==
   /\ Set(r, "loaded")
   /\ UNCHANGED <<search, snapshots, delivered>>
 
-\* Phase 3.1: update-task-status(processing). tasks.updateTaskStatus refuses it only from completed.
+\* Phase 3.1: update-task-status(processing). convex/taskTransitions.ts refuses it from completed.
 RunStarts(r) ==
   /\ run[r] = "loaded"
   /\ IF search \in {"pending", "processing", "failed"}
@@ -62,11 +62,11 @@ RunStarts(r) ==
        ELSE search' = search /\ Set(r, "idle")
   /\ UNCHANGED <<snapshots, delivered>>
 
-\* Any phase: update-task-status(failed). Accepted from every status of a search that exists.
+\* Any phase: update-task-status(failed). convex/taskTransitions.ts refuses it from completed.
 RunReportsFailure(r) ==
   /\ run[r] \in {"loaded", "working"}
   /\ Set(r, "idle")
-  /\ search' = IF Exists THEN "failed" ELSE search
+  /\ search' = IF search \in {"pending", "processing", "failed"} THEN "failed" ELSE search
   /\ UNCHANGED <<snapshots, delivered>>
 
 \* The Claude Code session ends without a word.
