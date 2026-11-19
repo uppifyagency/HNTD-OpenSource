@@ -5,6 +5,7 @@ import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { clerkEventAgeMs, eventAgeMs, outcomeForApplyResult } from "./webhookOutcome";
 import { clerkUserIdFromPayer } from "./clerkBillingDecision";
+import { SETTABLE_STATUSES, isSettableStatus } from "./taskTransitions";
 
 // Constant-time string comparison using double-HMAC via Web Crypto API.
 // Prevents timing attacks on secret/token comparisons.
@@ -271,7 +272,7 @@ http.route({
     if (authErr) return authErr;
 
     try {
-      const { taskId, developerIds } = await request.json();
+      const { taskId, developerIds, error } = await request.json();
       if (!taskId || typeof taskId !== "string") {
         return new Response(JSON.stringify({ error: "taskId is required" }), {
           status: 400,
@@ -284,6 +285,12 @@ http.route({
           headers: { "Content-Type": "application/json" },
         });
       }
+      if (error !== undefined && typeof error !== "string") {
+        return new Response(JSON.stringify({ error: "error must be a string" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       if (developerIds.length > 500) {
         return new Response(JSON.stringify({ error: "developerIds exceeds maximum of 500" }), {
           status: 400,
@@ -291,16 +298,17 @@ http.route({
         });
       }
 
-      await ctx.runMutation(internal.taskResults.createTaskResult, {
+      const outcome = await ctx.runMutation(internal.tasks.completeTask, {
         taskId: taskId as Id<"tasks">,
         developerIds: developerIds as Id<"developers">[],
+        error,
       });
-
-      await ctx.runMutation(internal.tasks.updateTaskStatus, {
-        taskId: taskId as Id<"tasks">,
-        status: "completed",
-        resultCount: developerIds.length,
-      });
+      if (outcome === "task_not_found") {
+        return new Response(JSON.stringify({ error: "Task not found", code: "task_not_found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
 
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -322,21 +330,20 @@ http.route({
 
     try {
       const body = await request.json();
-      const { taskId, status, resultCount, error } = body;
+      const { taskId, status, error } = body;
       if (!taskId || !status) {
         return new Response(JSON.stringify({ error: "taskId and status are required" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
       }
-      const validStatuses = ["pending", "processing", "completed", "failed"];
-      if (!validStatuses.includes(status)) {
-        return new Response(JSON.stringify({ error: `status must be one of: ${validStatuses.join(", ")}` }), {
+      if (!isSettableStatus(status)) {
+        return new Response(JSON.stringify({ error: `status must be one of: ${SETTABLE_STATUSES.join(", ")}` }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
       }
-      await ctx.runMutation(internal.tasks.updateTaskStatus, { taskId, status, resultCount, error });
+      await ctx.runMutation(internal.tasks.updateTaskStatus, { taskId, status, error });
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },

@@ -12,7 +12,7 @@ import glob as globmod
 
 # Add parent to path for convex_client import
 sys.path.insert(0, os.path.dirname(__file__))
-from convex_client import upsert_developer, complete_task, log_pipeline_event, update_task_status
+from convex_client import TaskNotFound, upsert_developer, complete_task, log_pipeline_event
 import pass_io
 
 
@@ -835,20 +835,23 @@ def main():
     if DRY_RUN:
         print(f"\n[DRY-RUN] Would complete task {TASK_ID} with {pushed} developers")
     elif developer_ids:
-        # If some developers failed, annotate the error before completing
+        # A partial push completes the search with a note saying how many developers failed.
+        error_msg = None
         if errors > 0:
             error_msg = f"Partial: {errors} developer(s) failed to push out of {pushed + errors} attempted"
             print(f"  WARNING: {error_msg}")
+        print(f"\nCompleting task {TASK_ID} with {len(developer_ids)} developers...")
+        try:
+            result = complete_task(TASK_ID, developer_ids, error=error_msg)
+        except TaskNotFound:
+            print(f"Search {TASK_ID} was deleted while the pipeline ran; its results were not stored.")
+            return False
+        print(f"  Task completed: {result}")
+        if errors:
             log_pipeline_event(TASK_ID, "complete",
                                f"Task completed with errors: {len(developer_ids)} pushed, {errors} failed",
                                level="warn",
                                metadata={"developerCount": len(developer_ids), "errors": errors})
-        # complete_task is the last call — no irreversible state before error annotation
-        print(f"\nCompleting task {TASK_ID} with {len(developer_ids)} developers...")
-        result = complete_task(TASK_ID, developer_ids)
-        print(f"  Task completed: {result}")
-        if errors > 0:
-            update_task_status(TASK_ID, "completed", error=error_msg)
         else:
             log_pipeline_event(TASK_ID, "complete",
                                f"Task completed: {len(developer_ids)} developers scored",

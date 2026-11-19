@@ -15,22 +15,6 @@ class TestBRK01ImportAndOrder(unittest.TestCase):
         from convex_client import update_task_status
         self.assertTrue(callable(update_task_status))
 
-    def test_push_results_imports_update_task_status(self):
-        """push_results module-level import must include update_task_status."""
-        import ast
-
-        src_path = os.path.join(os.path.dirname(__file__), "push_results.py")
-        with open(src_path) as f:
-            source = f.read()
-        tree = ast.parse(source)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module == "convex_client":
-                names = [alias.name for alias in node.names]
-                self.assertIn("update_task_status", names,
-                              "update_task_status must be in convex_client import")
-                return
-        self.fail("No 'from convex_client import ...' found in push_results.py")
-
 
 class TestBRK05MissingFetchFile(unittest.TestCase):
     """BRK-05: load_fetch_data must exit gracefully when fetch file is missing."""

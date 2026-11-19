@@ -7,7 +7,11 @@ import { mutation, query, internalMutation, internalQuery } from "./_generated/s
 import { assertAdmin, requireCurrentUser, getAdminEmails } from "./users";
 import { canGrantAdmin } from "./adminAuthz";
 import { checkTaskQuota } from "./planLimits";
-import { checkStatusTransition } from "./taskTransitions";
+import {
+  SETTABLE_STATUSES,
+  checkStatusTransition,
+  type TaskStatus,
+} from "./taskTransitions";
 
 export const createTask = mutation({
   args: {
@@ -144,49 +148,79 @@ export const getPendingTasks = internalQuery({
   },
 });
 
+function assertTransition(from: TaskStatus, to: TaskStatus) {
+  const verdict = checkStatusTransition(from, to);
+  if (!verdict.allowed) {
+    throw new ConvexError({
+      code: "invalid_transition",
+      error: `Invalid task status transition: ${from} → ${to}: ${verdict.reason}`,
+      from,
+      to,
+    });
+  }
+}
+
+function truncateError(error: string | undefined) {
+  return error && error.length > 2000 ? error.slice(0, 2000) + "... [truncated]" : error;
+}
+
+// Sets any status but `completed`; only `completeTask` completes a search.
 export const updateTaskStatus = internalMutation({
   args: {
     taskId: v.id("tasks"),
-    status: v.union(
-      v.literal("pending"),
-      v.literal("processing"),
-      v.literal("completed"),
-      v.literal("failed")
-    ),
-    resultCount: v.optional(v.number()),
+    status: v.union(...SETTABLE_STATUSES.map((s) => v.literal(s))),
     error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) throw new Error("Task not found");
+    assertTransition(task.status, args.status);
 
-    const verdict = checkStatusTransition(task.status, args.status);
-    if (!verdict.allowed) {
-      throw new ConvexError({
-        code: "invalid_transition",
-        error: `Invalid task status transition: ${task.status} → ${args.status}: ${verdict.reason}`,
-        from: task.status,
-        to: args.status,
-      });
-    }
-
-    const errorMsg = args.error && args.error.length > 2000
-      ? args.error.slice(0, 2000) + "... [truncated]"
-      : args.error;
     const updates: Record<string, unknown> = { status: args.status };
     if (args.status === "processing") {
       updates.processingStartedAt = Date.now();
     }
-    if (args.status === "completed") {
-      updates.completedAt = Date.now();
-      updates.processingStartedAt = undefined;
-      if (args.resultCount !== undefined) updates.resultCount = args.resultCount;
-    }
     if (args.status === "failed") {
       updates.processingStartedAt = undefined;
     }
+    const errorMsg = truncateError(args.error);
     if (errorMsg) updates.error = errorMsg;
     await ctx.db.patch(args.taskId, updates);
+  },
+});
+
+// Stores a search's result list and marks it completed in one transaction, so a search deleted
+// meanwhile gets no orphan result list (#1) and a completed search always has one (#4).
+export const completeTask = internalMutation({
+  args: {
+    taskId: v.id("tasks"),
+    developerIds: v.array(v.id("developers")),
+    error: v.optional(v.string()),
+  },
+  returns: v.union(v.literal("completed"), v.literal("task_not_found")),
+  handler: async (ctx, args) => {
+    if (args.developerIds.length > 500) {
+      throw new Error("Too many developer IDs (max 500)");
+    }
+    const task = await ctx.db.get(args.taskId);
+    if (!task) return "task_not_found";
+    assertTransition(task.status, "completed");
+
+    const now = Date.now();
+    await ctx.db.insert("taskResults", {
+      taskId: args.taskId,
+      developerIds: args.developerIds,
+      createdAt: now,
+    });
+    const errorMsg = truncateError(args.error);
+    await ctx.db.patch(args.taskId, {
+      status: "completed",
+      completedAt: now,
+      resultCount: args.developerIds.length,
+      processingStartedAt: undefined,
+      ...(errorMsg ? { error: errorMsg } : {}),
+    });
+    return "completed";
   },
 });
 

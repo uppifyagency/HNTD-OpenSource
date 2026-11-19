@@ -1,25 +1,7 @@
 import { v } from "convex/values";
-import { query, internalMutation, internalQuery } from "./_generated/server";
+import { query, internalQuery } from "./_generated/server";
 import { requireCurrentUser, getAdminEmails } from "./users";
 import { canGrantAdmin } from "./adminAuthz";
-
-export const createTaskResult = internalMutation({
-  args: {
-    taskId: v.id("tasks"),
-    developerIds: v.array(v.id("developers")),
-  },
-  returns: v.id("taskResults"),
-  handler: async (ctx, args) => {
-    if (args.developerIds.length > 500) {
-      throw new Error("Too many developer IDs (max 500)");
-    }
-    return await ctx.db.insert("taskResults", {
-      taskId: args.taskId,
-      developerIds: args.developerIds,
-      createdAt: Date.now(),
-    });
-  },
-});
 
 export const getTaskResults = query({
   args: { taskId: v.id("tasks") },
