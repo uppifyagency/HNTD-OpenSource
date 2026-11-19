@@ -22,30 +22,30 @@ stateDiagram-v2
   s3: Failed
   s4: In queue, both runs read it
   s5: Processing
-  s6: Failed, the other run is still on it
-  s7: Processing, the other run read it too
-  s8: Completed, shortlist shown
-  s9: Processing, two runs at once
-  s10: Completed, the other run is still on it
+  s6: Completed, shortlist shown
+  s7: Failed, the other run is still on it
+  s8: Processing, the other run read it too
+  s9: Completed, the other run is still on it
+  s10: Processing, two runs at once
   [*] --> s0
   s0 --> s1: you start a search
   s1 --> s2: a run reads the queue
   s2 --> s3: a run reports a failure
   s2 --> s4: a run reads the queue
   s2 --> s5: a run starts searching GitHub
-  s4 --> s6: a run reports a failure
-  s4 --> s7: a run starts searching GitHub
+  s4 --> s7: a run reports a failure
+  s4 --> s8: a run starts searching GitHub
   s5 --> s3: a run reports a failure
-  s6 --> s3: a run reports a failure
-  s6 --> s5: a run starts searching GitHub
-  s5 --> s8: a run marks it completed
-  s7 --> s6: a run reports a failure
-  s7 --> s9: a run starts searching GitHub
-  s7 --> s10: a run marks it completed
-  s9 --> s6: a run reports a failure
-  s10 --> s8: the other run's failure is refused or the other run finds it completed and stops or a run marks it completed
-  s6 --> s8: a run marks it completed
-  s9 --> s10: a run marks it completed
+  s5 --> s6: a run delivers the shortlist
+  s7 --> s3: a run reports a failure
+  s7 --> s5: a run starts searching GitHub
+  s8 --> s7: a run reports a failure
+  s8 --> s9: a run delivers the shortlist
+  s8 --> s10: a run starts searching GitHub
+  s9 --> s6: the other run's failure is refused or the other run finds it completed and stops or a run delivers the shortlist
+  s7 --> s6: a run delivers the shortlist
+  s10 --> s7: a run reports a failure
+  s10 --> s9: a run delivers the shortlist
   classDef breaks fill:#ffecee,stroke:#e72e3b,stroke-width:2.5px,color:#cd2834
   class s0 tan
   class s0 bugPath
@@ -57,11 +57,11 @@ stateDiagram-v2
   class s4 tan
   class s4 bugPath
   class s5 blue
-  class s6 orange
-  class s7 blue
-  class s7 bugPath
-  class s8 teal
-  class s9 blue
-  class s9 breaks
-  class s9 bugPath
-  class s10 teal
+  class s6 teal
+  class s7 orange
+  class s8 blue
+  class s8 bugPath
+  class s9 teal
+  class s10 blue
+  class s10 breaks
+  class s10 bugPath

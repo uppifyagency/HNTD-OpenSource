@@ -1,8 +1,19 @@
 // Which task status changes the server accepts. The table below is the single source of truth:
-// `tasks.updateTaskStatus` asks it before every write.
+// `tasks.updateTaskStatus` and `tasks.completeTask` ask it before every write.
 // Pure: no Convex imports and no process.env, so vitest and the client bundle can import it.
 
 export type TaskStatus = "pending" | "processing" | "completed" | "failed";
+
+// The statuses the generic setter (`tasks.updateTaskStatus`, POST /api/update-task-status) may
+// write. `completed` is not one: only `tasks.completeTask` completes a search, in the same
+// transaction that stores its result list (issues #1 and #4).
+export const SETTABLE_STATUSES = ["pending", "processing", "failed"] as const;
+
+export type SettableStatus = (typeof SETTABLE_STATUSES)[number];
+
+export function isSettableStatus(status: unknown): status is SettableStatus {
+  return SETTABLE_STATUSES.includes(status as SettableStatus);
+}
 
 export type TransitionVerdict = { allowed: true } | { allowed: false; reason: string };
 

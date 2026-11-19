@@ -20,14 +20,15 @@ Source [`two-runs.mmd`](two-runs.mmd), report [`two-runs.report.md`](two-runs.re
 
 ![Two runs on one search](two-runs.svg)
 
-A red state breaks a rule. A blue border marks the shortest path to it.
+A red state breaks a rule. A blue border marks the shortest path to it. The lifecycle chart has
+no red state left: with one run, every rule holds.
 
 ## The rules
 
 | Rule | In plain words | Result |
 |---|---|---|
-| `NoResultsForDeletedSearch` | A deleted search leaves no shortlist behind. | Breaks with one run |
-| `CompletedHasResults` | A search shown as completed has a shortlist. | Breaks with one run |
+| `NoResultsForDeletedSearch` | A deleted search leaves no shortlist behind. | Holds since `tasks.completeTask` |
+| `CompletedHasResults` | A search shown as completed has a shortlist. | Holds since `tasks.completeTask` |
 | `DeliveredStaysCompleted` | Once a shortlist is delivered, the search stays completed until you reset or delete it. | Holds since the transition table (`convex/taskTransitions.ts`) |
 | `OneRunAtATime` | At most one pipeline run works on a search. | Breaks with two runs |
 | `NoDeadlock` | No state is a dead end, apart from a deleted search. | Holds |
@@ -43,17 +44,13 @@ it and marks an unfinished one `failed` when its run ends, so in local mode the 
 `Processing, no pipeline run alive` lasts only until the worker notices. The model does not
 have the worker as an actor yet.
 
-1. **A deleted search leaves a shortlist behind.** You start a search, a run starts on it, you
-   delete it from the dashboard, the run stores its shortlist. `complete-task` writes the result
-   list without checking that the search exists (`convex/taskResults.ts`, `createTaskResult`),
-   then fails with `Task not found`. Replay: `deleted.txt` shows the HTTP 500 and the orphan row
-   in `taskResults`. Any delete during a run triggers it, and a run lasts minutes.
-2. **Completed, with no shortlist.** A reset lands between the run storing its shortlist and
-   marking the search completed. The reset wipes the shortlist and the late write still flips the
-   search to completed. Replay: `completed-empty.txt` and `completed-no-shortlist.png`. The page
-   reads `Sviluppatori trovati: 4` above `Nessuno sviluppatore.` The replay sent the last write
-   on its own, because the two writes of `complete-task` cannot be split from outside. Inside
-   one request the window is milliseconds, so this one is rare.
+1. **A deleted search leaves a shortlist behind.** Fixed. `complete-task` used to store the
+   result list without checking that the search existed, then fail on the status write.
+   `tasks.completeTask` now does both in one transaction and answers HTTP 404 for a search that
+   is gone. Nothing is stored.
+2. **Completed, with no shortlist.** Fixed. A reset could land between the two writes of
+   `complete-task`, or between it and the second status write of `push_results.py`. There is
+   one write now, and `update-task-status` can no longer set `completed` at all (HTTP 400).
 3. **Failed after it had completed.** Fixed. Two runs read the same queued search, the first
    delivered the shortlist, and the second reported a failure that the backend accepted.
    `convex/taskTransitions.ts` now refuses every change out of `completed` except `completed`

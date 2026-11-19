@@ -834,7 +834,8 @@ rm -f skill/output/checkpoint-<TASK_ID>.json
 - `gh` not signed in or GitHub API unreachable → mark task "failed" with error message
 - Subagent timeout/crash → log warn-level event, retry 1x, then mark task "failed"
 - Convex write failure → save to `skill/output/failed-<TASK_ID>.json`
-- Zero search results → mark task "completed" with resultCount: 0
+- Zero search results → complete the task with an empty result list: `complete_task('<TASK_ID>', [])`
+  (`update_task_status` cannot set `completed`)
 - Critical subagent (searcher, fetcher, pusher) failure → mark task "failed"
 - Non-critical subagent (score-validator, enricher) failure → continue pipeline
 - **Pipeline logging is fire-and-forget:** `log_pipeline_event()` uses try/except with

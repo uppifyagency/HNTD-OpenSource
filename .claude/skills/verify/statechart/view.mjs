@@ -1,8 +1,8 @@
 // The reader's words for SearchLifecycle.tla with one-run.cfg: the whole life of one search.
 const runs = (v) => Object.values(v.run);
 const count = (v, ...states) => runs(v).filter((r) => states.includes(r)).length;
-const working = (v) => count(v, "working", "stored");
-const onIt = (v) => count(v, "loaded", "working", "stored");
+const working = (v) => count(v, "working");
+const onIt = (v) => count(v, "loaded", "working");
 
 export const title = "HNTD search: from the form to the shortlist";
 
@@ -46,11 +46,8 @@ export const step = (action, from, to) => {
       return from.search === "completed" ? "the run's failure is refused" : "the run stops, the search is gone";
     case "RunDies":
       return from.search === "deleted" ? "the run stops, the search is gone" : "the Claude Code session ends mid-run";
-    case "RunStoresResults":
-      return "the run stores the shortlist";
-    case "RunMarksCompleted":
-      if (to.search !== "completed") return "the run stops, the search is gone";
-      return to.snapshots === 0 ? "the run marks it completed, the reset wiped its shortlist" : "the run marks it completed";
+    case "RunCompletes":
+      return to.search === "completed" ? "the run delivers the shortlist" : "the run stops, the search is gone";
     case "WatchdogRequeues":
       return "the watchdog requeues it [30 minutes in processing]";
     default:

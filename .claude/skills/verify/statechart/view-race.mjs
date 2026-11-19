@@ -1,6 +1,6 @@
 // The reader's words for SearchLifecycle.tla with race.cfg: two pipeline runs, nobody at the keyboard.
 const count = (v, ...states) => Object.values(v.run).filter((r) => states.includes(r)).length;
-const working = (v) => count(v, "working", "stored");
+const working = (v) => count(v, "working");
 const read = (v) => count(v, "loaded");
 
 export const title = "HNTD search: two pipeline runs on one search";
@@ -32,10 +32,8 @@ export const step = (action, from, to) => {
       return to.search === "processing" ? "a run starts searching GitHub" : "the other run finds it completed and stops";
     case "RunReportsFailure":
       return to.search === "failed" ? "a run reports a failure" : "the other run's failure is refused";
-    case "RunStoresResults":
-      return "a run stores the shortlist";
-    case "RunMarksCompleted":
-      return "a run marks it completed";
+    case "RunCompletes":
+      return "a run delivers the shortlist";
     default:
       return null;
   }

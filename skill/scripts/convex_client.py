@@ -72,10 +72,25 @@ def upsert_developer(developer_data: dict) -> str:
     return resp.json()["id"]
 
 
-def complete_task(task_id: str, developer_ids: list[str]):
-    """Mark a task as completed with the list of found developer IDs."""
-    resp = _request_with_retry(requests.post, f"{CONVEX_URL}/api/complete-task",
-                               json={"taskId": task_id, "developerIds": developer_ids})
+class TaskNotFound(Exception):
+    """The backend has no such task: it was deleted while the pipeline ran."""
+
+
+def complete_task(task_id: str, developer_ids: list[str], error: str = None):
+    """Store the result list and mark the task completed, in one backend transaction.
+
+    `error` is an optional note kept on the completed task. Raises TaskNotFound when the
+    task no longer exists; nothing is stored then.
+    """
+    body = {"taskId": task_id, "developerIds": developer_ids}
+    if error:
+        body["error"] = error
+    try:
+        resp = _request_with_retry(requests.post, f"{CONVEX_URL}/api/complete-task", json=body)
+    except requests.exceptions.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 404:
+            raise TaskNotFound(task_id) from exc
+        raise
     return resp.json()
 
 

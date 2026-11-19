@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { checkStatusTransition, type TaskStatus } from "../../../convex/taskTransitions";
+import {
+  SETTABLE_STATUSES,
+  checkStatusTransition,
+  type TaskStatus,
+} from "../../../convex/taskTransitions";
 
 // Every from/to pair with the verdict the server must give. Editing the table in
 // convex/taskTransitions.ts without editing this one fails the suite.
 // Issue #2: a completed search was flipped to `failed` by a late pipeline write, which hid its
-// shortlist. From `completed`, only `completed` (the pipeline re-attaching an error note) passes.
+// shortlist. From `completed`, only `completed` (a retried complete-task) passes.
 const EXPECTED: Record<TaskStatus, Record<TaskStatus, boolean>> = {
   pending: { pending: true, processing: true, completed: true, failed: true },
   processing: { pending: true, processing: true, completed: true, failed: true },
@@ -25,5 +29,13 @@ describe("checkStatusTransition", () => {
     const verdict = checkStatusTransition(from, to);
     expect(verdict.allowed).toBe(allowed);
     if (!verdict.allowed) expect(verdict.reason).not.toBe("");
+  });
+});
+
+// Issues #1 and #4: only `tasks.completeTask` may complete a search, in the same transaction
+// that stores its result list. The generic status setter never writes `completed`.
+describe("SETTABLE_STATUSES", () => {
+  it("is exactly pending, processing and failed", () => {
+    expect([...SETTABLE_STATUSES].sort()).toEqual(["failed", "pending", "processing"]);
   });
 });
