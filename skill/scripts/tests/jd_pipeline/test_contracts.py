@@ -157,7 +157,8 @@ class TestContract_Normalized_To_Push:
 
 
 class TestContract_GraphQL_To_Push:
-    """The graphql golden data must produce payloads the backend's upsertDeveloper accepts."""
+    """Payloads built from the graphql golden data validate against push_developer.schema.json,
+    which copies the per-repo array shapes of the upsertDeveloper validator in convex/developers.ts."""
 
     @pytest.mark.parametrize("login", [
         "alice-fullstack", "bob-backend", "carol-junior", "dave-devops", "eve-inactive",
