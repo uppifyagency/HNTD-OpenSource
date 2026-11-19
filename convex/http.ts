@@ -1,4 +1,5 @@
 import { httpRouter } from "convex/server";
+import { ConvexError } from "convex/values";
 import { httpAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -84,6 +85,14 @@ async function requireAuth(request: Request): Promise<Response | null> {
 }
 
 function errorResponse(error: unknown, status = 500): Response {
+  // A status change refused by convex/taskTransitions.ts is a conflict with the task's state,
+  // not a server fault. ctx.runMutation rethrows the mutation's ConvexError with its data.
+  if (error instanceof ConvexError && error.data?.code === "invalid_transition") {
+    return new Response(JSON.stringify(error.data), {
+      status: 409,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   const message = error instanceof Error ? error.message : "Internal server error";
   return new Response(JSON.stringify({ error: message }), {
     status,

@@ -7,6 +7,7 @@ import { mutation, query, internalMutation, internalQuery } from "./_generated/s
 import { assertAdmin, requireCurrentUser, getAdminEmails } from "./users";
 import { canGrantAdmin } from "./adminAuthz";
 import { checkTaskQuota } from "./planLimits";
+import { checkStatusTransition } from "./taskTransitions";
 
 export const createTask = mutation({
   args: {
@@ -159,14 +160,14 @@ export const updateTaskStatus = internalMutation({
     const task = await ctx.db.get(args.taskId);
     if (!task) throw new Error("Task not found");
 
-    // Block nonsensical backward transitions from completed state
-    const BLOCKED_TRANSITIONS: Record<string, string[]> = {
-      completed: ["processing", "pending"],
-    };
-    if (BLOCKED_TRANSITIONS[task.status]?.includes(args.status)) {
-      throw new Error(
-        `Invalid task status transition: ${task.status} → ${args.status}`
-      );
+    const verdict = checkStatusTransition(task.status, args.status);
+    if (!verdict.allowed) {
+      throw new ConvexError({
+        code: "invalid_transition",
+        error: `Invalid task status transition: ${task.status} → ${args.status}: ${verdict.reason}`,
+        from: task.status,
+        to: args.status,
+      });
     }
 
     const errorMsg = args.error && args.error.length > 2000

@@ -20,7 +20,7 @@ const TRANSITIONS: Record<TaskStatus, Record<TaskStatus, TransitionVerdict>> = {
     pending: AFTER_COMPLETED,
     processing: AFTER_COMPLETED,
     completed: ALLOW,
-    failed: ALLOW,
+    failed: AFTER_COMPLETED,
   },
   failed: { pending: ALLOW, processing: ALLOW, completed: ALLOW, failed: ALLOW },
 };
