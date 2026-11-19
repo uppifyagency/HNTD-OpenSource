@@ -39,7 +39,6 @@ Preconditions:
 ## Gotchas
 
 - `term-run` and the worker were not driven. A run needs a GitHub token, `claude` signed in, the network, several minutes and Claude tokens. Confirm with the user before you launch with `HNTD_VERIFY_WORKER=1`.
-- Known defect: deleting a search while the worker runs it stops the worker for good, until `.convex/hntd-worker-inflight.json` is deleted by hand.
 - `client create` needs the Convex user ID, not the name. The local user row exists only after a browser has opened `/dashboard` once. Before that, `client users` prints `No users found.` `launch` makes that first visit through the printed link.
 - `client` reads `skill/scripts/.env`. `run.sh` rewrites that file on every start, because the backend port can change. The file can hold a `GH_TOKEN`. Never print it.
 - `term-push` proves the push step alone when it runs through `seed-results`.

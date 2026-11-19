@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import requests
 
 # convex_client exits at import without a backend; nothing here talks to it.
 os.environ.setdefault("CONVEX_SITE_URL", "http://127.0.0.1:9")
@@ -222,6 +223,57 @@ def test_run_log_folder_made_by_an_older_worker_becomes_private(fake_claude):
     worker.LOG_DIR.chmod(0o755)
     worker.new_log("t1")
     assert oct(worker.LOG_DIR.stat().st_mode & 0o777) == "0o700"
+
+
+def http_error(status: int) -> requests.HTTPError:
+    """The error convex_client raises for an HTTP error status from the backend."""
+    response = requests.Response()
+    response.status_code = status
+    return requests.HTTPError(f"{status} from the backend", response=response)
+
+
+@pytest.fixture
+def backend(fake_claude, tmp_path, monkeypatch):
+    """The worker's state files under tmp_path and a backend that holds no task: get_task raises
+    `backend.error` (a 404, as for a deleted search). Status updates are recorded."""
+    monkeypatch.setattr(worker, "ROOT", tmp_path)
+    monkeypatch.setattr(worker, "WRITABLE", tmp_path / "skill" / "output")
+    monkeypatch.setattr(worker, "STATUS", tmp_path / "status.json")
+
+    class Backend:
+        error = http_error(404)
+        updates = []
+
+        @staticmethod
+        def get_task(task_id):
+            raise Backend.error
+
+    monkeypatch.setattr(worker.convex_client, "get_task", Backend.get_task)
+    monkeypatch.setattr(worker.convex_client, "update_task_status",
+                        lambda task_id, status, error=None: Backend.updates.append((task_id, status)))
+    return Backend
+
+
+def test_a_search_deleted_during_its_run_counts_as_finished(backend):
+    worker.process("t1", {"ok": True})
+    assert not worker.INFLIGHT.exists()
+    assert backend.updates == [("t1", "processing")]
+
+
+def test_a_crashed_run_of_a_deleted_search_is_cleared(backend):
+    worker.write_json(worker.INFLIGHT, {"taskId": "t1", "pid": None})
+    worker.recover_inflight()
+    assert not worker.INFLIGHT.exists()
+    assert backend.updates == []
+
+
+@pytest.mark.parametrize("error", [http_error(500), requests.ConnectionError("backend restarting")])
+def test_a_backend_that_does_not_answer_keeps_the_run_for_the_next_loop(backend, error):
+    backend.error = error
+    worker.write_json(worker.INFLIGHT, {"taskId": "t1", "pid": None})
+    with pytest.raises(requests.RequestException):
+        worker.recover_inflight()
+    assert json.loads(worker.INFLIGHT.read_text()) == {"taskId": "t1", "pid": None}
 
 
 def test_claude_runs_without_the_users_own_config():
