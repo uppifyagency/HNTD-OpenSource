@@ -110,9 +110,10 @@ test-results/
 docs/design-references/
 docs/hntd-redesign-v2/
 
-# local dev tooling / skills (not app code); the pipeline's entry point is shipped
+# local dev tooling / skills (not app code); the pipeline's entry point and the verification skill are shipped
 .claude/skills/*
 !.claude/skills/github-hr/
+!.claude/skills/verify/
 artifacts/hiring-agent-src/
 # nWave activation marker (keep .nwave/local-config.json trackable)
 .nwave/*

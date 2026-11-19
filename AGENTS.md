@@ -12,6 +12,8 @@ Notes for contributors and AI coding agents. `README.md` covers what HNTD is and
 - `skill/` the Claude Code pipeline: `skill/github-hr/SKILL.md` is the entry point,
   `skill/skills/*` are its phases, `skill/scripts/*.py` do the deterministic work.
 - `scripts/local/` local mode: `setup.sh` once, `run.sh` (`npm run local`) every time.
+- `.claude/skills/verify/` the verification skill: `SKILL.md` drives the running app and captures
+  proof, `features/` is the map of user-facing features, `statechart/` is the state map of a search.
 
 ## Checks
 
@@ -20,6 +22,9 @@ npm test                      # vitest
 npm run build                 # type-check and build
 skill/scripts/run-tests.sh    # pipeline tests; needs skill/scripts/requirements-dev.txt installed
 ```
+
+To prove a change on the running app, follow `.claude/skills/verify/SKILL.md`. Its harness keeps
+the pipeline worker off and restores the local database when it stops.
 
 Run Python tests through `run-tests.sh`, not a bare `pytest` in `skill/scripts`: collecting
 `push_results.py` as a test module fails, and the acceptance suites collide when collected together.
