@@ -320,7 +320,7 @@ http.route({
   }),
 });
 
-// POST /api/claim-task — the pipeline takes a pending search before working on it (issue #3)
+// POST /api/claim-task: a pipeline run takes a pending search before it works on it
 http.route({
   path: "/api/claim-task",
   method: "POST",

@@ -184,3 +184,9 @@ def test_claim_command_on_a_missing_task_exits_4(backend, capsys):
     backend.answer = (404, {"error": "Task not found", "code": "task_not_found"})
     assert convex_client.claim_command("T1") == 4
     assert "not found" in capsys.readouterr().out
+
+
+def test_a_404_from_a_backend_without_the_route_is_not_a_deleted_task(backend):
+    backend.answer = (404, {})
+    with pytest.raises(requests.exceptions.HTTPError):
+        convex_client.claim_task("T1")

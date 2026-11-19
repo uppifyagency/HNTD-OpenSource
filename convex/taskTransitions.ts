@@ -1,13 +1,14 @@
-// Which task status changes the server accepts. The table below is the single source of truth:
-// `tasks.updateTaskStatus`, `tasks.claimTask` and `tasks.completeTask` ask it before every write.
-// Pure: no Convex imports and no process.env, so vitest and the client bundle can import it.
+// Which task status changes the pipeline may make. `tasks.updateTaskStatus`, `tasks.claimTask`
+// and `tasks.completeTask` ask the table below before every write. A reset (`tasks.resetTask`,
+// `tasks.internalResetTask`) and a delete do not: they are the user's way out of any status.
+// Pure: no Convex imports and no process.env, so vitest can import it.
 
 export type TaskStatus = "pending" | "processing" | "completed" | "failed";
 
 // The statuses the generic setter (`tasks.updateTaskStatus`, POST /api/update-task-status) may
 // write. `completed` is not one: only `tasks.completeTask` completes a search, in the same
-// transaction that stores its result list (issues #1 and #4). `processing` is not one: only
-// `tasks.claimTask` starts a search, so exactly one run holds it (issue #3).
+// transaction that stores its result list. `processing` is not one: only `tasks.claimTask`
+// starts a search, so exactly one run holds it.
 export const SETTABLE_STATUSES = ["pending", "failed"] as const;
 
 export type SettableStatus = (typeof SETTABLE_STATUSES)[number];

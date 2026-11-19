@@ -340,7 +340,7 @@ def test_a_refused_claim_starts_no_run_and_marks_nothing(worker_run, monkeypatch
         return answer
 
     monkeypatch.setattr(worker.convex_client, "claim_task", claim_task)
-    worker.process("t1", {"ok": True})
+    assert worker.process("t1", {"ok": True}) is False
     assert not started.exists()
     assert not worker.INFLIGHT.exists()
     assert writes == []
@@ -351,7 +351,7 @@ def test_a_granted_claim_runs_claude_holding_it(worker_run, monkeypatch):
     claims = []
     monkeypatch.setattr(worker.convex_client, "claim_task",
                         lambda task_id: claims.append(task_id) or {"claimed": True})
-    worker.process("t1", {"ok": True})
+    assert worker.process("t1", {"ok": True}) is True
     assert claims == ["t1"]
     assert started.read_text().strip() == "t1"
     assert not worker.INFLIGHT.exists()

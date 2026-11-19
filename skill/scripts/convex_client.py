@@ -73,41 +73,41 @@ def upsert_developer(developer_data: dict) -> str:
 
 
 class TaskNotFound(Exception):
-    """The backend has no such task: it was deleted while the pipeline ran."""
+    pass
+
+
+def _post_task(route: str, body: dict):
+    """POST to a task route. Raises TaskNotFound when the backend says the task is gone.
+
+    Only the route's own answer counts (code "task_not_found"): a backend that does not serve
+    the route yet also answers 404, and that is an error, not a deleted task."""
+    try:
+        return _request_with_retry(requests.post, f"{CONVEX_URL}{route}", json=body)
+    except requests.exceptions.HTTPError as exc:
+        resp = exc.response
+        if resp is not None and resp.status_code == 404:
+            try:
+                gone = resp.json().get("code") == "task_not_found"
+            except ValueError:
+                gone = False
+            if gone:
+                raise TaskNotFound(body["taskId"]) from exc
+        raise
 
 
 def complete_task(task_id: str, developer_ids: list[str], error: str = None):
-    """Store the result list and mark the task completed, in one backend transaction.
-
-    `error` is an optional note kept on the completed task. Raises TaskNotFound when the
-    task no longer exists; nothing is stored then.
-    """
+    """Store the result list and complete the task in one backend transaction. `error` is an
+    optional note kept on the task. Raises TaskNotFound, storing nothing, if the task is gone."""
     body = {"taskId": task_id, "developerIds": developer_ids}
     if error:
         body["error"] = error
-    try:
-        resp = _request_with_retry(requests.post, f"{CONVEX_URL}/api/complete-task", json=body)
-    except requests.exceptions.HTTPError as exc:
-        if exc.response is not None and exc.response.status_code == 404:
-            raise TaskNotFound(task_id) from exc
-        raise
-    return resp.json()
+    return _post_task("/api/complete-task", body).json()
 
 
 def claim_task(task_id: str) -> dict:
-    """Take a pending task for this run: pending -> processing, one compare-and-set on the backend.
-
-    Returns {"claimed": True}, or {"claimed": False, "status": <current status>} when the task is
-    not pending (another run holds it, or it is finished). Raises TaskNotFound when it is gone.
-    """
-    try:
-        resp = _request_with_retry(requests.post, f"{CONVEX_URL}/api/claim-task",
-                                   json={"taskId": task_id})
-    except requests.exceptions.HTTPError as exc:
-        if exc.response is not None and exc.response.status_code == 404:
-            raise TaskNotFound(task_id) from exc
-        raise
-    return resp.json()
+    """Returns {"claimed": True}, or {"claimed": False, "status": <current status>} when the task
+    is not pending. Raises TaskNotFound when it is gone."""
+    return _post_task("/api/claim-task", {"taskId": task_id}).json()
 
 
 CLAIMED_BY_WORKER_ENV = "HNTD_CLAIMED_TASK"  # set by scripts/local/worker.py for the run it starts
@@ -130,8 +130,7 @@ def claim_command(task_id: str) -> int:
         return 0
     status = claim.get("status")
     print(f"Task {task_id} not claimed: it is {status}, and only a pending task can be claimed.")
-    if status in ("processing", "completed", "failed"):
-        print(f"If no other run is working on it, run /github-hr reset {task_id} first.")
+    print(f"If no other run is working on it, run /github-hr reset {task_id} first.")
     return 3
 
 

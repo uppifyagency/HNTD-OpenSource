@@ -282,16 +282,19 @@ def recover_inflight() -> None:
     INFLIGHT.unlink()
 
 
-def process(task_id: str, github: dict) -> None:
+def process(task_id: str, github: dict) -> bool:
+    """Claim the task and run it. False when the claim was not granted and nothing ran."""
     write_json(INFLIGHT, {"taskId": task_id, "pid": None})
     try:
         claim = convex_client.claim_task(task_id)
     except convex_client.TaskNotFound:
-        claim = {"claimed": False, "status": "deleted"}
-    if not claim.get("claimed"):
-        log(f"{task_id}: not claimed, it is {claim.get('status')}; another run has it or it is gone")
+        log(f"{task_id}: not claimed, the search was deleted")
         INFLIGHT.unlink()
-        return
+        return False
+    if not claim.get("claimed"):
+        log(f"{task_id}: not claimed, it is {claim.get('status')}: another run holds it")
+        INFLIGHT.unlink()
+        return False
     log_path = new_log(task_id)
     write_status("running", github, taskId=task_id, log=str(log_path.relative_to(ROOT)))
     log(f"{task_id}: running claude {' '.join(model_args()) or '(default model)'}, log {log_path}")
@@ -304,6 +307,7 @@ def process(task_id: str, github: dict) -> None:
     fail_if_unfinished(task_id, f"La pipeline si e' fermata senza finire: {last[:400]} "
                                 f"(log: {log_path.relative_to(ROOT)})")
     INFLIGHT.unlink()
+    return True
 
 
 def write_status(state: str, github: dict | None, **extra) -> None:
@@ -336,8 +340,8 @@ def main() -> None:
             elif not shutil.which("claude"):
                 write_status("error", github, error="Claude Code (claude) non installato")
             else:
-                process(pending[0]["_id"], github)
-                continue
+                if process(pending[0]["_id"], github):
+                    continue  # more may be waiting; after a refused claim, wait a poll instead
         except Exception as exc:  # the backend restarting, a network blip: report and keep polling
             log(f"error: {exc}")
             write_status("error", github, error=str(exc)[:300])

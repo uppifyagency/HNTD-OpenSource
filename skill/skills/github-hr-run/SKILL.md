@@ -55,6 +55,8 @@ Before starting, check for a checkpoint file from a previous interrupted run:
 Read `skill/output/checkpoint-{TASK_ID}.json` (if it exists).
 
 If the checkpoint file exists:
+- First run Phase 1's claim for the task. A refused claim stops the resume like any other
+  refused claim, before you touch the checkpoint: another run may own it.
 - Parse it: `{ taskId, lastCompletedPhase, timestamp, pass, metadata }`
 - Log: `"Resuming task {TASK_ID} from phase {next_phase} (last completed: {lastCompletedPhase})"`
 - Validate that expected output files for completed phases still exist
@@ -62,9 +64,6 @@ If the checkpoint file exists:
 - Otherwise, SKIP directly to the next phase after `lastCompletedPhase`
 
 If no checkpoint exists, proceed normally from Phase 1.
-
-On resume, run Phase 1's claim for the task before you skip ahead. A refused claim stops the
-resume like any other refused claim.
 
 **After EACH phase completion**, write/update the checkpoint:
 ```bash

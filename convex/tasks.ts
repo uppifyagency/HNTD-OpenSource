@@ -187,7 +187,7 @@ export const updateTaskStatus = internalMutation({
 });
 
 // Takes a search for one run: compare-and-set from `pending` to `processing` in one transaction,
-// so of two runs that claim the same search only one is granted it (#3). A refusal is an
+// so of two runs that claim the same search only one is granted it. A refusal is an
 // expected answer, not an error: the caller leaves the search alone.
 export const claimTask = internalMutation({
   args: { taskId: v.id("tasks") },
@@ -216,7 +216,7 @@ export const claimTask = internalMutation({
 });
 
 // Stores a search's result list and marks it completed in one transaction, so a search deleted
-// meanwhile gets no orphan result list (#1) and a completed search always has one (#4).
+// meanwhile gets no orphan result list and a completed search always has one.
 export const completeTask = internalMutation({
   args: {
     taskId: v.id("tasks"),
