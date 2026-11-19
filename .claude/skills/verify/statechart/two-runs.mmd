@@ -1,0 +1,74 @@
+---
+title: "HNTD search: two pipeline runs on one search"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: waiting
+    lg1: running
+    lg2: done
+    lg3: failed
+    lg4: Breaks DeliveredStaysCompleted or OneRunAtATime
+    lg5: Path to the DeliveredStaysCompleted or OneRunAtATime bug
+  }
+  class lg0 tan
+  class lg1 blue
+  class lg2 teal
+  class lg3 orange
+  class lg4 breaks
+  class lg5 bugPath
+  s0: No search yet
+  s1: In queue
+  s2: In queue, one run read it
+  s3: Failed
+  s4: In queue, both runs read it
+  s5: Processing
+  s6: Failed, the other run is still on it
+  s7: Processing, the other run read it too
+  s8: Completed, shortlist shown
+  s9: Processing, two runs at once
+  s10: Completed, the other run is still on it
+  s11: Failed after it had completed
+  [*] --> s0
+  s0 --> s1: you start a search
+  s1 --> s2: a run reads the queue
+  s2 --> s3: a run reports a failure
+  s2 --> s4: a run reads the queue
+  s2 --> s5: a run starts searching GitHub
+  s4 --> s6: a run reports a failure
+  s4 --> s7: a run starts searching GitHub
+  s5 --> s3: a run reports a failure
+  s6 --> s3: a run reports a failure
+  s6 --> s5: a run starts searching GitHub
+  s5 --> s8: a run marks it completed
+  s7 --> s6: a run reports a failure
+  s7 --> s7: a run stores the shortlist
+  s7 --> s9: a run starts searching GitHub
+  s7 --> s10: a run marks it completed
+  s9 --> s6: a run reports a failure
+  s10 --> s8: the other run finds it completed and stops or a run marks it completed
+  s10 --> s11: a run reports a failure
+  s6 --> s8: a run marks it completed
+  s9 --> s10: a run marks it completed
+  classDef breaks fill:#ffecee,stroke:#e72e3b,stroke-width:2.5px,color:#cd2834
+  class s0 tan
+  class s0 bugPath
+  class s1 tan
+  class s1 bugPath
+  class s2 tan
+  class s2 bugPath
+  class s3 orange
+  class s4 tan
+  class s4 bugPath
+  class s5 blue
+  class s6 orange
+  class s7 blue
+  class s7 bugPath
+  class s8 teal
+  class s9 blue
+  class s9 breaks
+  class s9 bugPath
+  class s10 teal
+  class s10 bugPath
+  class s11 orange
+  class s11 breaks
+  class s11 bugPath

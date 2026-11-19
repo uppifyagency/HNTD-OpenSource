@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+# Verification harness for HNTD local mode. Usage: hntd-verify <command> [args]
+#   launch          snapshot the local database, start `scripts/local/run.sh` on HNTD_VERIFY_PORT
+#                   (default 3100) and wait until the app is usable. The pipeline worker stays
+#                   off unless HNTD_VERIFY_WORKER=1, so no search a recipe creates is run for real
+#   doctor          read-only health check of the instance `launch` started
+#   stop            stop the instance `launch` started, then put the snapshot back
+#   browser ...     run browser steps against the instance (see scripts/browser.mjs)
+#   client ...      run skill/scripts/convex_client.py (the pipeline's view of the database)
+#   api METHOD PATH [JSON]   call the pipeline HTTP API with the local API secret
+#   seed-results TASK_ID     push fixture candidates for a search with the real push_results.py
+set -euo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(git -C "$HERE" rev-parse --show-toplevel)
+cd "$ROOT"
+
+STATE=.convex/verify
+PIDFILE=$STATE/run.pid
+PORTFILE=$STATE/port
+LOG=$STATE/run.log
+DB=.convex/local/default          # where the Convex CLI keeps this checkout's database (convex_local_backend.sqlite3)
+DB_BEFORE=$STATE/db-before
+DB_LAST=$STATE/last-run-db
+SEEDED=$STATE/seeded-files
+LOCKPID=$STATE/worker-lock.pid
+FIXTURES=skill/scripts/tests/jd_pipeline/fixtures
+
+env_get() { { grep "^$2=" "$1" 2>/dev/null || true; } | head -1 | cut -d= -f2-; }
+convex_url() { env_get .env.local NEXT_PUBLIC_CONVEX_URL; }
+site_url() { env_get skill/scripts/.env CONVEX_SITE_URL; }
+port() { if [ -f "$PORTFILE" ]; then cat "$PORTFILE"; else echo "${HNTD_VERIFY_PORT:-3100}"; fi; }
+app_url() { echo "http://127.0.0.1:$(port)"; }
+run_pid() { [ -f "$PIDFILE" ] && cat "$PIDFILE" || true; }
+alive() { [ -n "${1:-}" ] && kill -0 "$1" 2>/dev/null; }
+browser_key() { node scripts/local/keys.mjs browser-key; }
+# The session route answers only a browser that holds the browser key cookie (src/lib/session/loopback.ts).
+session_ok() { curl -sf -m 5 -b "hntd_local=$(browser_key)" "$1/api/local-session" 2>/dev/null | grep -q '"token"'; }
+
+# scripts/local/worker.py runs every pending search with Claude Code and allows one worker per
+# checkout through a lock on .convex/worker.lock. Holding that lock first keeps it from starting.
+hold_worker_lock() {
+  python3 -c '
+import fcntl, sys, time
+lock = open(sys.argv[1], "w")
+fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+print("held", flush=True)
+while True: time.sleep(3600)
+' .convex/worker.lock > "$STATE/worker-lock.out" 2>&1 < /dev/null &
+  echo $! > "$LOCKPID"
+  for _ in $(seq 20); do grep -q held "$STATE/worker-lock.out" 2>/dev/null && return 0; sleep 0.2; done
+  echo "refusing: could not take .convex/worker.lock, so a pipeline worker is already running here"; exit 1
+}
+listener() { lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null | head -1; }
+
+descends_from() {  # $1 = pid, $2 = ancestor
+  local pid=$1
+  while [ -n "$pid" ] && [ "$pid" != 1 ] && [ "$pid" != 0 ]; do
+    [ "$pid" = "$2" ] && return 0
+    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+  done
+  return 1
+}
+
+api() {
+  local secret; secret=$(env_get skill/scripts/.env API_SECRET)
+  curl -s -m 20 -X "$1" "$(site_url)$2" -H "Authorization: Bearer $secret" \
+    -H "Content-Type: application/json" ${3:+-d "$3"}
+}
+
+cmd_launch() {
+  grep -q '^NEXT_PUBLIC_HNTD_MODE=local$' .env.local 2>/dev/null \
+    || { echo "no local-mode .env.local: run scripts/local/setup.sh first"; exit 1; }
+  if alive "$(run_pid)"; then echo "already running (pid $(run_pid)); checking it"; cmd_doctor; return; fi
+  local url; url=$(convex_url)
+  if [ -n "$url" ] && curl -sf -m 2 "$url/version" >/dev/null; then
+    echo "refusing: a Convex backend already answers at $url and this harness did not start it."
+    echo "The user is probably running 'npm run local' in this checkout. Do not drive their session."
+    exit 1
+  fi
+  local p=${HNTD_VERIFY_PORT:-3100}
+  [ -z "$(listener "$p")" ] || { echo "refusing: port $p is taken. Set HNTD_VERIFY_PORT to a free port."; exit 1; }
+  [ -d "$DB" ] || { echo "no local database at $DB: run scripts/local/setup.sh first"; exit 1; }
+  [ ! -e "$DB_BEFORE" ] || { echo "refusing: $DB_BEFORE exists, so an earlier run never put the database back. Run: hntd-verify stop"; exit 1; }
+  mkdir -p "$STATE"
+  cp -R "$DB" "$DB_BEFORE"
+  echo "$p" > "$PORTFILE"
+  [ "${HNTD_VERIFY_WORKER:-0}" = 1 ] || hold_worker_lock
+  PORT=$p nohup scripts/local/run.sh > "$LOG" 2>&1 < /dev/null &
+  echo $! > "$PIDFILE"
+  local secret site
+  for _ in $(seq 240); do
+    alive "$(run_pid)" || { echo "run.sh exited early; log:"; tail -30 "$LOG"; rm -f "$PIDFILE"; exit 1; }
+    secret=$(env_get skill/scripts/.env API_SECRET); site=$(site_url)
+    if session_ok "http://127.0.0.1:$p" \
+      && curl -sf -m 60 -o /dev/null "http://127.0.0.1:$p/dashboard" \
+      && curl -sf -m 5 -o /dev/null "$site/api/pending-tasks" -H "Authorization: Bearer $secret"; then
+      # The user's first step is the link `npm run local` prints: it stores the browser key and
+      # opens /dashboard, and that first visit creates the local user row.
+      if [ "${HNTD_VERIFY_SKIP_FIRST_VISIT:-0}" != 1 ]; then
+        HNTD_VERIFY_BASE="http://127.0.0.1:$p" node "$HERE/browser.mjs" --out "$STATE/first-visit" \
+          goto "/api/local-session?key=$(browser_key)" url '/dashboard$' expect 'text=your searches' >/dev/null 2>&1 \
+          || echo "warning: could not open /dashboard in a browser. Run: hntd-verify doctor"
+      fi
+      echo "READY $(app_url)/dashboard (pid $(run_pid), log $LOG)"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "not ready after 240s; log:"; tail -30 "$LOG"; exit 1
+}
+
+cmd_doctor() {
+  local fail=0 pid p lpid code
+  pid=$(run_pid); p=$(port)
+  check() { if [ "$2" = ok ]; then echo "ok    $1"; else echo "FAIL  $1: $2"; fail=1; fi; }
+
+  if alive "$pid"; then check "run.sh started by this harness is alive (pid $pid)" ok
+  else check "run.sh started by this harness" "not running; run: hntd-verify launch"; fi
+
+  lpid=$(listener "$p")
+  if [ -n "$lpid" ] && alive "$pid" && descends_from "$lpid" "$pid"; then check "port $p is served by our process tree" ok
+  else check "port $p ownership" "listener pid '${lpid:-none}' is not ours"; fi
+
+  if session_ok "$(app_url)"; then check "app is in local mode and signs a session for the browser key" ok
+  else check "local session" "$(app_url)/api/local-session did not return a token"; fi
+
+  if [ -f "$LOCKPID" ] && alive "$(cat "$LOCKPID")"; then check "the pipeline worker is held off (no search runs for real)" ok
+  elif [ "${HNTD_VERIFY_WORKER:-0}" = 1 ]; then check "the pipeline worker is ON by request: a search created here runs with Claude Code" ok
+  else check "pipeline worker" "nothing holds .convex/worker.lock; a created search could run for real"; fi
+
+  if curl -sf -m 5 "$(convex_url)/version" >/dev/null; then check "Convex backend answers at $(convex_url)" ok
+  else check "Convex backend" "no answer at $(convex_url)"; fi
+
+  code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' "$(site_url)/api/pending-tasks" \
+    -H "Authorization: Bearer $(env_get skill/scripts/.env API_SECRET)" || true)
+  if [ "$code" = 200 ]; then check "pipeline API accepts skill/scripts/.env secret at $(site_url)" ok
+  else check "pipeline API" "GET /api/pending-tasks returned $code"; fi
+
+  if api GET /api/users-dashboard 2>/dev/null | grep -q 'local@hntd.local'; then check "the local user row exists" ok
+  else check "local user" "no user row yet; open /dashboard once: hntd-verify browser goto /dashboard expect 'text=your searches'"; fi
+
+  if node "$HERE/browser.mjs" --check >/dev/null 2>&1; then check "a Chromium browser is available to Playwright" ok
+  else check "browser" "no Chrome and no Playwright Chromium; run: npx playwright install chromium"; fi
+
+  echo "build $(git rev-parse --short HEAD)$(git diff --quiet HEAD -- src convex scripts 2>/dev/null || echo ' +uncommitted changes') (dev server serves the working tree)"
+  return $fail
+}
+
+# The run's database moves to $DB_LAST instead of being deleted, so one wrong restore can be undone.
+restore_db() {
+  [ -d "$DB_BEFORE" ] || return 0
+  if curl -sf -m 1 "$(convex_url)/version" >/dev/null; then
+    echo "not restoring the database: a Convex backend still answers at $(convex_url)"; return 1
+  fi
+  rm -rf "$DB_LAST"
+  [ ! -d "$DB" ] || mv "$DB" "$DB_LAST"
+  mv "$DB_BEFORE" "$DB"
+  echo "database restored to its state before launch (the run's copy is in $DB_LAST)"
+}
+
+cmd_stop() {
+  local pid p f; pid=$(run_pid); p=$(port)
+  if alive "$pid"; then
+    kill -TERM "$pid"
+    for _ in $(seq 40); do alive "$pid" || break; sleep 1; done
+    alive "$pid" && { echo "pid $pid did not exit after 40s"; exit 1; }
+    for _ in $(seq 20); do
+      [ -z "$(listener "$p")" ] && ! curl -sf -m 1 "$(convex_url)/version" >/dev/null && break
+      sleep 1
+    done
+    echo "stopped (pid $pid)"
+  else
+    echo "no running instance"
+  fi
+  rm -f "$PIDFILE" "$PORTFILE"
+  if [ -f "$LOCKPID" ]; then kill "$(cat "$LOCKPID")" 2>/dev/null || true; rm -f "$LOCKPID" "$STATE/worker-lock.out"; fi
+  restore_db
+  if [ -f "$SEEDED" ]; then
+    while IFS= read -r f; do rm -f "$f"; done < "$SEEDED"
+    rm -f "$SEEDED"
+  fi
+  echo "Evidence under test-results/verify/ is untouched."
+}
+
+# Everything before the push is skipped (GitHub search, fetch, Claude scoring): copy the golden
+# fixtures into skill/output under this task ID, then push_results.py pushes them for real.
+cmd_seed_results() {
+  local task=${1:?usage: hntd-verify seed-results TASK_ID} max pair src dst
+  alive "$(run_pid)" || { echo "no instance started by this harness; run: hntd-verify launch"; exit 1; }
+  max=$(api GET "/api/get-task?taskId=$task" | python3 -c 'import json,sys; print(json.load(sys.stdin)["params"]["maxResults"])') \
+    || { echo "task $task not found"; exit 1; }
+  mkdir -p skill/output
+  for pair in golden_fetch:fetch-$task golden_scores:score-$task-batch-0 golden_normalized:normalized-$task \
+              golden_deterministic:deterministic-rank-$task golden_prefilter:prefilter-$task; do
+    src=$FIXTURES/${pair%%:*}.json; dst=skill/output/${pair##*:}.json
+    cp "$src" "$dst"; echo "$dst" >> "$SEEDED"
+  done
+  echo "skill/output/result-$task.json" >> "$SEEDED"
+  skill/scripts/.venv/bin/python skill/scripts/push_results.py "$task" --max-results "$max"
+}
+
+case "${1:-}" in
+  launch) cmd_launch ;;
+  doctor) cmd_doctor ;;
+  stop) cmd_stop ;;
+  browser) shift; HNTD_VERIFY_BASE=$(app_url) HNTD_VERIFY_BROWSER_KEY=$(browser_key) exec node "$HERE/browser.mjs" "$@" ;;
+  client) shift; exec skill/scripts/.venv/bin/python skill/scripts/convex_client.py "$@" ;;
+  api) shift; api "$@"; echo ;;
+  seed-results) shift; cmd_seed_results "$@" ;;
+  *) sed -n '2,12p' "$HERE/hntd-verify" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac
