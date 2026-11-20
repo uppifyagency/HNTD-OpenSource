@@ -22,6 +22,7 @@ export const step = (action) =>
   ({
     YouCreate: "you start a search",
     RunClaims: "one of the two runs claims it, the other is refused",
+    RunWrites: "the run saves progress [JD profile, pass results]",
     RunReportsFailure: "the run reports a failure",
     RunCompletes: "the run delivers the shortlist",
   })[action] ?? null;
