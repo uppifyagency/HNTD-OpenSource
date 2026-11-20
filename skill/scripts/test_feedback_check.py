@@ -333,3 +333,32 @@ class TestRefinedStrategyPriorityTier:
         assert all("priorityTier" not in r for r in no_follower), (
             "no-follower strategy must omit priorityTier when the source lacks one"
         )
+
+
+# A run that lost its search to another run (after a requeue or a reset) must stop.
+# Persisting pass results is otherwise best-effort: a network error does not end the run.
+class TestPassResultsWrite:
+    def _run_main(self, tmp_path, monkeypatch, error):
+        import json
+        import convex_client
+        import feedback_check
+
+        def update_pass_results(task_id, pass_results, claim_id=None):
+            raise error
+
+        (tmp_path / "normalized-T.json").write_text(json.dumps([{"login": "a", "normalizedScore": 80}]))
+        monkeypatch.setattr(feedback_check, "OUTPUT_DIR", tmp_path)
+        monkeypatch.setattr(convex_client, "update_pass_results", update_pass_results)
+        monkeypatch.setattr("sys.argv", ["feedback_check.py", "--task-id", "T", "--pass-number", "1"])
+        feedback_check.main()
+
+    def test_a_lost_claim_stops_the_run(self, tmp_path, monkeypatch, capsys):
+        import convex_client
+        with pytest.raises(SystemExit) as stop:
+            self._run_main(tmp_path, monkeypatch, convex_client.ClaimLost("T", "another run claimed the search"))
+        assert stop.value.code not in (0, None)
+        assert "another run" in capsys.readouterr().out
+
+    def test_a_network_error_is_not_fatal(self, tmp_path, monkeypatch, capsys):
+        self._run_main(tmp_path, monkeypatch, ConnectionError("backend restarting"))
+        assert "non-fatal" in capsys.readouterr().out

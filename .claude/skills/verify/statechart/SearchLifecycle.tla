@@ -1,34 +1,49 @@
 --------------------------- MODULE SearchLifecycle ---------------------------
 (* One HNTD search, from the dashboard form to the shortlist.                  *)
 (* Sources: convex/tasks.ts, convex/taskResults.ts, convex/http.ts,            *)
-(* skill/skills/github-hr-run/SKILL.md, skill/scripts/push_results.py.         *)
-EXTENDS Naturals, FiniteSets
+(* convex/taskTransitions.ts, skill/skills/github-hr-run/SKILL.md,            *)
+(* skill/scripts/push_results.py.                                              *)
+EXTENDS Naturals
 
-CONSTANT Runs  \* pipeline runs that can be alive at once (Claude Code sessions, cron)
+CONSTANT Runs       \* pipeline runs that can be alive at once (Claude Code sessions, cron)
+CONSTANT CheckToken \* TRUE: the backend refuses a stale claim token. FALSE: the same backend without that check.
 
 VARIABLES
   search,     \* what the dashboard shows: none, pending, processing, completed, failed, deleted
   snapshots,  \* stored result lists for this search (rows in taskResults); 2 means two or more
   delivered,  \* a shortlist was delivered and you have not reset or deleted the search since
-  run         \* each run: idle, or working (it holds the claim on the search)
+  run,        \* each run: idle, or working (it believes it holds the claim on the search)
+  holder,     \* the run whose claim token is on the search (tasks.claimId), or NoRun
+  writer,     \* the run whose writes landed since the search was last claimed, or NoRun
+  clash       \* writes of two different runs landed under one claim
 
-vars == <<search, snapshots, delivered, run>>
+vars == <<search, snapshots, delivered, run, holder, writer, clash>>
+
+NoRun == "none"
 
 Exists == search \in {"pending", "processing", "completed", "failed"}
-Active(r) == run[r] = "working"
 Set(r, to) == run' = [run EXCEPT ![r] = to]
+
+\* Every pipeline write carries the run's claim token. The backend accepts it only while the
+\* search is processing and the token is still the one on the search.
+Holds(r) == search = "processing" /\ (holder = r \/ ~CheckToken)
+Lands(r) == /\ writer' = r
+            /\ clash' = (clash \/ writer \notin {NoRun, r})
 
 Init ==
   /\ search = "none"
   /\ snapshots = 0
   /\ delivered = FALSE
   /\ run = [r \in Runs |-> "idle"]
+  /\ holder = NoRun
+  /\ writer = NoRun
+  /\ clash = FALSE
 
 \* tasks.createTask
 YouCreate ==
   /\ search = "none"
   /\ search' = "pending"
-  /\ UNCHANGED <<snapshots, delivered, run>>
+  /\ UNCHANGED <<snapshots, delivered, run, holder, writer, clash>>
 
 \* tasks.deleteOwnTask: deletes the search and its result lists. A run in flight is not told.
 YouDelete ==
@@ -36,55 +51,77 @@ YouDelete ==
   /\ search' = "deleted"
   /\ snapshots' = 0
   /\ delivered' = FALSE
-  /\ UNCHANGED run
+  /\ holder' = NoRun
+  /\ UNCHANGED <<run, writer, clash>>
 
-\* /github-hr reset -> tasks.internalResetTask: allowed from every status.
+\* /github-hr reset -> tasks.internalResetTask: allowed from every status. Clears the claim.
 YouReset ==
   /\ Exists
   /\ search' = "pending"
   /\ snapshots' = 0
   /\ delivered' = FALSE
-  /\ UNCHANGED run
+  /\ holder' = NoRun
+  /\ UNCHANGED <<run, writer, clash>>
 
 \* claim-task: tasks.claimTask takes the search with one compare-and-set, pending to
-\* processing. The worker claims when it picks a search, a run started by hand in phase 1.
-\* A run that does not get the claim does not work on the search.
+\* processing, and stores the run's token. The worker claims when it picks a search, a run
+\* started by hand in phase 1. A run that does not get the claim does not work on the search.
 RunClaims(r) ==
   /\ run[r] = "idle"
   /\ search = "pending"
   /\ search' = "processing"
   /\ Set(r, "working")
-  /\ UNCHANGED <<snapshots, delivered>>
+  /\ holder' = r
+  /\ writer' = r
+  /\ UNCHANGED <<snapshots, delivered, clash>>
 
-\* Any phase: update-task-status(failed). convex/taskTransitions.ts refuses it from completed.
+\* Phases 2 to 6: update-jd-profile and update-pass-results. A refused write (HTTP 409,
+\* claim_lost) tells the run that it lost the search, and the run stops.
+RunWrites(r) ==
+  /\ run[r] = "working"
+  /\ IF Holds(r)
+       THEN /\ Lands(r)
+            /\ UNCHANGED run
+       ELSE /\ Set(r, "idle")
+            /\ UNCHANGED <<writer, clash>>
+  /\ UNCHANGED <<search, snapshots, delivered, holder>>
+
+\* Any phase: update-task-status(failed). Refused unless the run holds the claim.
 RunReportsFailure(r) ==
   /\ run[r] = "working"
   /\ Set(r, "idle")
-  /\ search' = IF search \in {"pending", "processing", "failed"} THEN "failed" ELSE search
-  /\ UNCHANGED <<snapshots, delivered>>
+  /\ IF Holds(r)
+       THEN /\ search' = "failed"
+            /\ Lands(r)
+       ELSE UNCHANGED <<search, writer, clash>>
+  /\ UNCHANGED <<snapshots, delivered, holder>>
 
 \* The Claude Code session ends without a word.
 RunDies(r) ==
   /\ run[r] = "working"
   /\ Set(r, "idle")
-  /\ UNCHANGED <<search, snapshots, delivered>>
+  /\ UNCHANGED <<search, snapshots, delivered, holder, writer, clash>>
 
 \* complete-task: tasks.completeTask stores the result list and marks the search completed in
-\* one transaction. It does nothing when the search is gone.
+\* one transaction. Refused unless the run holds the claim, so nothing is stored then.
 RunCompletes(r) ==
   /\ run[r] = "working"
   /\ Set(r, "idle")
-  /\ IF Exists
+  /\ IF Holds(r)
        THEN /\ search' = "completed"
             /\ snapshots' = (IF snapshots < 2 THEN snapshots + 1 ELSE 2)
             /\ delivered' = TRUE
-       ELSE UNCHANGED <<search, snapshots, delivered>>
+            /\ Lands(r)
+       ELSE UNCHANGED <<search, snapshots, delivered, writer, clash>>
+  /\ UNCHANGED holder
 
-\* recover-stale-tasks: a search in processing for 30 minutes goes back to the queue.
+\* recover-stale-tasks -> tasks.requeueStaleTask: a search in processing for 30 minutes goes
+\* back to the queue and loses its claim. The run that held it may still be alive.
 WatchdogRequeues ==
   /\ search = "processing"
   /\ search' = "pending"
-  /\ UNCHANGED <<snapshots, delivered, run>>
+  /\ holder' = NoRun
+  /\ UNCHANGED <<snapshots, delivered, run, writer, clash>>
 
 Done ==
   /\ search = "deleted"
@@ -94,7 +131,7 @@ Done ==
 Next ==
   \/ YouCreate \/ YouDelete \/ YouReset \/ WatchdogRequeues \/ Done
   \/ \E r \in Runs :
-       \/ RunClaims(r) \/ RunReportsFailure(r) \/ RunDies(r)
+       \/ RunClaims(r) \/ RunWrites(r) \/ RunReportsFailure(r) \/ RunDies(r)
        \/ RunCompletes(r)
 
 \* The same pipeline with nobody at the keyboard, no watchdog and no session that dies: you
@@ -108,7 +145,7 @@ Quiet ==
 NextRace ==
   \/ YouCreate \/ Quiet
   \/ \E r \in Runs :
-       \/ RunClaims(r) \/ RunReportsFailure(r) \/ RunCompletes(r)
+       \/ RunClaims(r) \/ RunWrites(r) \/ RunReportsFailure(r) \/ RunCompletes(r)
 
 Spec == Init /\ [][Next]_vars
 
@@ -116,5 +153,7 @@ Spec == Init /\ [][Next]_vars
 NoResultsForDeletedSearch == search = "deleted" => snapshots = 0
 CompletedHasResults == search = "completed" => snapshots > 0
 DeliveredStaysCompleted == delivered => search = "completed"
-OneRunAtATime == Cardinality({r \in Runs : Active(r)}) <= 1
+\* Two runs can be alive on one search after a requeue or a reset: the one that lost the claim
+\* stops at its next write. What must not happen is that writes of both land.
+OneWriterPerClaim == ~clash
 =============================================================================

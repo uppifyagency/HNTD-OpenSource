@@ -211,7 +211,7 @@ def fake_claude(tmp_path, monkeypatch):
 
 def test_run_log_is_private_and_holds_no_token(fake_claude):
     log_path = worker.new_log("t1")
-    final = worker.run_claude("t1", log_path)
+    final = worker.run_claude("t1", "c1", log_path)
     assert oct(worker.LOG_DIR.stat().st_mode & 0o777) == "0o700"
     assert oct(log_path.stat().st_mode & 0o777) == "0o600"
     assert "saved-token-value-123" not in log_path.read_text()
@@ -235,18 +235,18 @@ def http_error(status: int) -> requests.HTTPError:
 @pytest.fixture
 def backend(fake_claude, tmp_path, monkeypatch):
     """The worker's state files under tmp_path and a backend that holds no task: get_task raises
-    `backend.error` (a 404, as for a deleted search). Status updates are recorded."""
+    `backend.error` (TaskNotFound, as for a deleted search). Status updates are recorded."""
     monkeypatch.setattr(worker, "ROOT", tmp_path)
     monkeypatch.setattr(worker, "WRITABLE", tmp_path / "skill" / "output")
     monkeypatch.setattr(worker, "STATUS", tmp_path / "status.json")
 
     class Backend:
-        error = http_error(404)
+        error = worker.convex_client.TaskNotFound("t1")
         updates = []
         claims = []
 
         @staticmethod
-        def claim_task(task_id):
+        def claim_task(task_id, claim_id=None):
             Backend.claims.append(task_id)
             return {"claimed": True}
 
@@ -257,7 +257,8 @@ def backend(fake_claude, tmp_path, monkeypatch):
     monkeypatch.setattr(worker.convex_client, "claim_task", Backend.claim_task)
     monkeypatch.setattr(worker.convex_client, "get_task", Backend.get_task)
     monkeypatch.setattr(worker.convex_client, "update_task_status",
-                        lambda task_id, status, error=None: Backend.updates.append((task_id, status)))
+                        lambda task_id, status, error=None, claim_id=None:
+                        Backend.updates.append((task_id, status)))
     return Backend
 
 
@@ -269,7 +270,7 @@ def test_a_search_deleted_during_its_run_counts_as_finished(backend):
 
 
 def test_a_crashed_run_of_a_deleted_search_is_cleared(backend):
-    worker.write_json(worker.INFLIGHT, {"taskId": "t1", "pid": None})
+    worker.write_json(worker.INFLIGHT, {"taskId": "t1", "pid": None, "claimId": "c1"})
     worker.recover_inflight()
     assert not worker.INFLIGHT.exists()
     assert backend.updates == []
@@ -278,10 +279,11 @@ def test_a_crashed_run_of_a_deleted_search_is_cleared(backend):
 @pytest.mark.parametrize("error", [http_error(500), requests.ConnectionError("backend restarting")])
 def test_a_backend_that_does_not_answer_keeps_the_run_for_the_next_loop(backend, error):
     backend.error = error
-    worker.write_json(worker.INFLIGHT, {"taskId": "t1", "pid": None})
+    inflight = {"taskId": "t1", "pid": None, "claimId": "c1"}
+    worker.write_json(worker.INFLIGHT, inflight)
     with pytest.raises(requests.RequestException):
         worker.recover_inflight()
-    assert json.loads(worker.INFLIGHT.read_text()) == {"taskId": "t1", "pid": None}
+    assert json.loads(worker.INFLIGHT.read_text()) == inflight
 
 
 def test_claude_runs_without_the_users_own_config():
@@ -315,13 +317,17 @@ def test_final_result_keeps_the_last_result_and_is_empty_without_one():
 
 @pytest.fixture
 def worker_run(tmp_path, monkeypatch):
-    """process() with the backend faked and a `claude` that records the claim it was given.
-    Returns the list of backend status writes and the file claude writes when it starts."""
+    """process() with the backend faked and a `claude` that records the claim id it was given
+    and the INFLIGHT file it ran under. Returns the list of backend status writes
+    (task, status, claim id), the file claude writes when it starts, and the run's state.
+    `state["status"]` is what get_task answers after the run."""
     started = tmp_path / "claude-started"
+    inflight_seen = tmp_path / "claude-inflight"
     bin_dir = tmp_path / "claude-bin"
     bin_dir.mkdir()
     claude = bin_dir / "claude"
-    claude.write_text(f'#!/bin/sh\necho "$HNTD_CLAIMED_TASK" > "{started}"\n'
+    claude.write_text(f'#!/bin/sh\necho "$HNTD_CLAIM_ID" > "{started}"\n'
+                      f'cp "{tmp_path / "inflight.json"}" "{inflight_seen}"\n'
                       'echo "{\\"type\\": \\"result\\", \\"result\\": \\"done\\"}"\n')
     claude.chmod(0o755)
     monkeypatch.setitem(worker.BASE_ENV, "PATH", f"{bin_dir}:/usr/bin:/bin")
@@ -332,17 +338,19 @@ def worker_run(tmp_path, monkeypatch):
     monkeypatch.setattr(worker, "ROOT", tmp_path)
     monkeypatch.setattr(worker, "WRITABLE", tmp_path / "skill" / "output")
     writes = []
+    state = {"status": "completed", "inflight_seen": inflight_seen}
     monkeypatch.setattr(worker.convex_client, "update_task_status",
-                        lambda task_id, status, error=None: writes.append((task_id, status)))
-    monkeypatch.setattr(worker.convex_client, "get_task", lambda task_id: {"status": "completed"})
-    return writes, started
+                        lambda task_id, status, error=None, claim_id=None:
+                        writes.append((task_id, status, claim_id)))
+    monkeypatch.setattr(worker.convex_client, "get_task", lambda task_id: {"status": state["status"]})
+    return writes, started, state
 
 
 @pytest.mark.parametrize("answer", [{"claimed": False, "status": "processing"}, "gone"])
 def test_a_refused_claim_starts_no_run_and_marks_nothing(worker_run, monkeypatch, answer):
-    writes, started = worker_run
+    writes, started, _ = worker_run
 
-    def claim_task(task_id):
+    def claim_task(task_id, claim_id=None):
         if answer == "gone":
             raise worker.convex_client.TaskNotFound(task_id)
         return answer
@@ -355,13 +363,70 @@ def test_a_refused_claim_starts_no_run_and_marks_nothing(worker_run, monkeypatch
 
 
 def test_a_granted_claim_runs_claude_holding_it(worker_run, monkeypatch):
-    writes, started = worker_run
+    writes, started, state = worker_run
     claims = []
     monkeypatch.setattr(worker.convex_client, "claim_task",
-                        lambda task_id: claims.append(task_id) or {"claimed": True})
+                        lambda task_id, claim_id=None: claims.append((task_id, claim_id)) or {"claimed": True})
     assert worker.process("t1", {"ok": True}) is True
-    assert claims == ["t1"]
-    assert started.read_text().strip() == "t1"
+    [(task_id, claim_id)] = claims
+    assert task_id == "t1" and claim_id
+    # The run writes with the worker's claim, and a crash recovery knows it.
+    assert started.read_text().strip() == claim_id
+    assert json.loads(state["inflight_seen"].read_text())["claimId"] == claim_id
     assert not worker.INFLIGHT.exists()
     assert writes == []
-    assert "HNTD_CLAIMED_TASK" not in worker.pipeline_env()
+
+
+# A run whose search was requeued or reset and claimed again must not overwrite the new run's
+# work. The worker writes only with the claim it took, and a refusal ends its turn.
+
+def test_each_search_gets_its_own_claim(worker_run, monkeypatch):
+    claims = []
+    monkeypatch.setattr(worker.convex_client, "claim_task",
+                        lambda task_id, claim_id=None: claims.append(claim_id) or {"claimed": True})
+    worker.process("t1", {"ok": True})
+    worker.process("t2", {"ok": True})
+    assert len(set(claims)) == 2 and all(claims)
+
+
+def test_a_run_that_ends_unfinished_is_failed_with_the_workers_claim(worker_run, monkeypatch):
+    writes, started, state = worker_run
+    state["status"] = "processing"
+    monkeypatch.setattr(worker.convex_client, "claim_task", lambda task_id, claim_id=None: {"claimed": True})
+    assert worker.process("t1", {"ok": True}) is True
+    [(task_id, status, claim_id)] = writes
+    assert (task_id, status) == ("t1", "failed")
+    assert claim_id == started.read_text().strip()
+
+
+def test_a_lost_claim_ends_the_workers_turn_without_a_retry(worker_run, monkeypatch, capsys):
+    _, _, state = worker_run
+    state["status"] = "processing"
+    monkeypatch.setattr(worker.convex_client, "claim_task", lambda task_id, claim_id=None: {"claimed": True})
+
+    def lost(task_id, status, error=None, claim_id=None):
+        raise worker.convex_client.ClaimLost(task_id, "another run claimed the search")
+
+    monkeypatch.setattr(worker.convex_client, "update_task_status", lost)
+    assert worker.process("t1", {"ok": True}) is True
+    assert not worker.INFLIGHT.exists()
+    assert "another run" in capsys.readouterr().out
+
+
+def test_a_crashed_run_is_failed_with_its_own_claim(worker_run):
+    writes, _, state = worker_run
+    state["status"] = "processing"
+    worker.write_json(worker.INFLIGHT, {"taskId": "t1", "pid": None, "claimId": "c1"})
+    worker.recover_inflight()
+    assert writes == [("t1", "failed", "c1")]
+    assert not worker.INFLIGHT.exists()
+
+
+def test_a_crashed_run_from_an_older_worker_without_a_claim_is_dropped(worker_run, capsys):
+    writes, _, state = worker_run
+    state["status"] = "processing"
+    worker.write_json(worker.INFLIGHT, {"taskId": "t1", "pid": None})
+    worker.recover_inflight()
+    assert writes == []
+    assert not worker.INFLIGHT.exists()
+    assert "/github-hr reset t1" in capsys.readouterr().out

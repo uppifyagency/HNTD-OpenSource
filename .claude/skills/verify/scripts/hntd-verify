@@ -183,7 +183,8 @@ cmd_stop() {
 }
 
 # Everything before the push is skipped (GitHub search, fetch, Claude scoring): copy the golden
-# fixtures into skill/output under this task ID, then push_results.py pushes them for real.
+# fixtures into skill/output under this task ID, then push_results.py pushes them for real. The push
+# stores nothing unless this run holds the search's claim.
 cmd_seed_results() {
   local task=${1:?usage: hntd-verify seed-results TASK_ID} max pair src dst
   alive "$(run_pid)" || { echo "no instance started by this harness; run: hntd-verify launch"; exit 1; }
@@ -197,6 +198,8 @@ cmd_seed_results() {
     cp "$src" "$dst"; echo "$dst" >> "$SEEDED"
   done
   echo "skill/output/result-$task.json" >> "$SEEDED"
+  export HNTD_CLAIM_ID=${HNTD_CLAIM_ID:-verify-seed}
+  skill/scripts/.venv/bin/python skill/scripts/convex_client.py claim "$task" || exit 1
   skill/scripts/.venv/bin/python skill/scripts/push_results.py "$task" --max-results "$max"
 }
 

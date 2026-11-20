@@ -85,14 +85,20 @@ async function requireAuth(request: Request): Promise<Response | null> {
   return null;
 }
 
+function isClaimId(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "" && value.length <= 128;
+}
+
+const invalidClaimId = () =>
+  Response.json({ error: "claimId must be a non-empty string of at most 128 characters" }, { status: 400 });
+
 function errorResponse(error: unknown, status = 500): Response {
-  // A status change refused by convex/taskTransitions.ts is a conflict with the task's state,
-  // not a server fault. ctx.runMutation rethrows the mutation's ConvexError with its data.
-  if (error instanceof ConvexError && error.data?.code === "invalid_transition") {
-    return new Response(JSON.stringify(error.data), {
-      status: 409,
-      headers: { "Content-Type": "application/json" },
-    });
+  // ctx.runMutation rethrows the mutation's ConvexError with its data.
+  if (error instanceof ConvexError && error.data?.code === "claim_lost") {
+    return Response.json(error.data, { status: 409 });
+  }
+  if (error instanceof ConvexError && error.data?.code === "task_not_found") {
+    return Response.json({ error: "Task not found", code: "task_not_found" }, { status: 404 });
   }
   const message = error instanceof Error ? error.message : "Internal server error";
   return new Response(JSON.stringify({ error: message }), {
@@ -272,13 +278,14 @@ http.route({
     if (authErr) return authErr;
 
     try {
-      const { taskId, developerIds, error } = await request.json();
+      const { taskId, claimId, developerIds, error } = await request.json();
       if (!taskId || typeof taskId !== "string") {
         return new Response(JSON.stringify({ error: "taskId is required" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
       }
+      if (!isClaimId(claimId)) return invalidClaimId();
       if (!Array.isArray(developerIds) || developerIds.some((id: unknown) => typeof id !== "string")) {
         return new Response(JSON.stringify({ error: "developerIds must be an array of strings" }), {
           status: 400,
@@ -300,6 +307,7 @@ http.route({
 
       const outcome = await ctx.runMutation(internal.tasks.completeTask, {
         taskId: taskId as Id<"tasks">,
+        claimId,
         developerIds: developerIds as Id<"developers">[],
         error,
       });
@@ -337,9 +345,7 @@ http.route({
         });
       }
 
-      if (claimId !== undefined && (typeof claimId !== "string" || !claimId.trim() || claimId.length > 128)) {
-        return Response.json({ error: "claimId must be a non-empty string of at most 128 characters" }, { status: 400 });
-      }
+      if (!isClaimId(claimId)) return invalidClaimId();
 
       const claim = await ctx.runMutation(internal.tasks.claimTask, {
         taskId: taskId as Id<"tasks">,
@@ -372,7 +378,7 @@ http.route({
 
     try {
       const body = await request.json();
-      const { taskId, status, error } = body;
+      const { taskId, claimId, status, error } = body;
       if (!taskId || !status) {
         return new Response(JSON.stringify({ error: "taskId and status are required" }), {
           status: 400,
@@ -380,12 +386,15 @@ http.route({
         });
       }
       if (!isSettableStatus(status)) {
-        return new Response(JSON.stringify({ error: `status must be one of: ${SETTABLE_STATUSES.join(", ")}` }), {
+        return new Response(JSON.stringify({
+          error: `status must be ${SETTABLE_STATUSES.join(" or ")}: claim-task starts a search and complete-task completes it`,
+        }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
       }
-      await ctx.runMutation(internal.tasks.updateTaskStatus, { taskId, status, error });
+      if (!isClaimId(claimId)) return invalidClaimId();
+      await ctx.runMutation(internal.tasks.updateTaskStatus, { taskId, claimId, status, error });
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -458,7 +467,7 @@ http.route({
         taskId: taskId as Id<"tasks">,
       });
       if (!task) {
-        return new Response(JSON.stringify({ error: "Task not found" }), {
+        return new Response(JSON.stringify({ error: "Task not found", code: "task_not_found" }), {
           status: 404,
           headers: { "Content-Type": "application/json" },
         });
@@ -490,8 +499,10 @@ http.route({
           headers: { "Content-Type": "application/json" },
         });
       }
+      if (!isClaimId(body.claimId)) return invalidClaimId();
       await ctx.runMutation(internal.tasks.updateJdProfile, {
         taskId: body.taskId,
+        claimId: body.claimId,
         jdProfile: body.jdProfile,
       });
       return new Response(JSON.stringify({ ok: true }), {
@@ -689,8 +700,10 @@ http.route({
           headers: { "Content-Type": "application/json" },
         });
       }
+      if (!isClaimId(body.claimId)) return invalidClaimId();
       await ctx.runMutation(internal.tasks.updatePassResults, {
         taskId: body.taskId,
+        claimId: body.claimId,
         passResults: body.passResults,
       });
       return new Response(JSON.stringify({ ok: true }), {
@@ -1207,25 +1220,13 @@ http.route({
     try {
       const body = await request.json();
       const thresholdMinutes = body.thresholdMinutes ?? 30;
-      const tasks = await ctx.runQuery(
-        internal.tasks.getStaleProcessingTasks,
-        { staleThresholdMs: thresholdMinutes * 60 * 1000 }
-      );
+      const staleThresholdMs = thresholdMinutes * 60 * 1000;
+      const tasks = await ctx.runQuery(internal.tasks.getStaleProcessingTasks, { staleThresholdMs });
 
       let recovered = 0;
       for (const task of tasks) {
-        try {
-          await ctx.runMutation(internal.tasks.updateTaskStatus, {
-            taskId: task._id,
-            status: "pending" as const,
-            error: `Auto-recovered: stuck processing since ${task.processingStartedAt ? new Date(task.processingStartedAt).toISOString() : 'unknown time'}`,
-          });
-        } catch (error) {
-          // The search completed between the stale read and this write: nothing to recover,
-          // and the stale searches after it still need their turn.
-          if (error instanceof ConvexError && error.data?.code === "invalid_transition") continue;
-          throw error;
-        }
+        const outcome = await ctx.runMutation(internal.tasks.requeueStaleTask, { taskId: task._id, staleThresholdMs });
+        if (outcome === "not_stale") continue;
         await ctx.runMutation(internal.pipelineLogs.insertLog, {
           taskId: task._id as string,
           phase: "watchdog",

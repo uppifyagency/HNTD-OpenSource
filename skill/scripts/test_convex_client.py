@@ -136,7 +136,7 @@ def backend(monkeypatch):
         return _response(*Backend.answer)
 
     monkeypatch.setattr(convex_client.requests, "post", post)
-    monkeypatch.delenv("HNTD_CLAIMED_TASK", raising=False)
+    monkeypatch.setenv("HNTD_CLAIM_ID", "run-a")
     Backend.calls = []
     return Backend
 
@@ -148,20 +148,22 @@ def test_claim_task_returns_a_granted_claim(backend):
     assert body["taskId"] == "T1"
 
 
-def test_claim_retry_reuses_its_id_but_another_run_gets_a_new_one(monkeypatch):
+def test_claim_retry_reuses_the_runs_id_and_another_run_sends_its_own(monkeypatch):
     attempts = []
 
     def post(url, *, json, **kwargs):
         attempts.append(json.get("claimId"))
         if len(attempts) == 1:
             raise requests.ReadTimeout("response lost after commit")
-        return _response(200, {"claimed": bool(attempts[0]) and attempts[-1] == attempts[0]})
+        return _response(200, {"claimed": attempts[-1] == attempts[0]})
 
     monkeypatch.setattr(convex_client.requests, "post", post)
     monkeypatch.setattr(convex_client.time, "sleep", lambda _: None)
+    monkeypatch.setenv("HNTD_CLAIM_ID", "run-a")
     assert convex_client.claim_task("T1") == {"claimed": True}
+    monkeypatch.setenv("HNTD_CLAIM_ID", "run-b")
     assert convex_client.claim_task("T1") == {"claimed": False}
-    assert len(attempts) == 3
+    assert attempts == ["run-a", "run-a", "run-b"]
 
 
 def test_claim_task_returns_a_refused_claim_with_the_current_status(backend):
@@ -175,18 +177,20 @@ def test_claim_task_raises_task_not_found_on_404(backend):
         convex_client.claim_task("T1")
 
 
-def test_claim_command_trusts_the_workers_claim_without_asking_the_backend(backend, monkeypatch, capsys):
-    monkeypatch.setenv("HNTD_CLAIMED_TASK", "T1")
+def test_a_run_started_by_the_worker_claims_with_the_workers_id(backend, capsys):
+    backend.answer = (200, {"claimed": True})
     assert convex_client.claim_command("T1") == 0
-    assert backend.calls == []
-    assert "worker already holds the claim" in capsys.readouterr().out
-
-
-def test_claim_command_claims_a_task_the_worker_does_not_hold(backend, monkeypatch, capsys):
-    monkeypatch.setenv("HNTD_CLAIMED_TASK", "OTHER")
-    assert convex_client.claim_command("T1") == 0
-    assert len(backend.calls) == 1
+    [(_, body)] = backend.calls
+    assert body == {"taskId": "T1", "claimId": "run-a"}
     assert "claimed" in capsys.readouterr().out
+
+
+def test_claim_command_without_a_run_identity_names_the_variable(backend, monkeypatch, capsys):
+    monkeypatch.delenv("HNTD_CLAIM_ID")
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    assert convex_client.claim_command("T1") != 0
+    assert backend.calls == []
+    assert "HNTD_CLAIM_ID" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("status", ["processing", "completed", "failed"])
@@ -208,3 +212,112 @@ def test_a_404_from_a_backend_without_the_route_is_not_a_deleted_task(backend):
     backend.answer = (404, {})
     with pytest.raises(requests.exceptions.HTTPError):
         convex_client.claim_task("T1")
+
+
+# After a requeue or a reset a second run claims the search while the first is still alive.
+# Every pipeline write carries the run's claim token, and the backend refuses (HTTP 409, code
+# claim_lost) a write from a run that no longer holds the search.
+
+def test_run_claim_id_prefers_hntd_claim_id(monkeypatch):
+    monkeypatch.setenv("HNTD_CLAIM_ID", "worker-claim")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "session-1")
+    assert convex_client.run_claim_id() == "worker-claim"
+
+
+def test_run_claim_id_falls_back_to_the_claude_session(monkeypatch):
+    monkeypatch.delenv("HNTD_CLAIM_ID", raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "session-1")
+    assert convex_client.run_claim_id() == "claude-session:session-1"
+
+
+def test_run_claim_id_without_any_identity_names_hntd_claim_id(monkeypatch):
+    monkeypatch.delenv("HNTD_CLAIM_ID", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    with pytest.raises(Exception, match="HNTD_CLAIM_ID"):
+        convex_client.run_claim_id()
+
+
+def _write(name):
+    """Each pipeline write, called the way the pipeline calls it. Returns the route it posts to."""
+    calls = {
+        "claim": (lambda **kw: convex_client.claim_task("T1", **kw), "claim-task"),
+        "failed": (lambda **kw: convex_client.update_task_status("T1", "failed", "boom", **kw),
+                   "update-task-status"),
+        "complete": (lambda **kw: convex_client.complete_task("T1", ["d1"], **kw), "complete-task"),
+        "jd_profile": (lambda **kw: convex_client.update_jd_profile("T1", _full_jd_profile(), **kw),
+                       "update-jd-profile"),
+        "pass_results": (lambda **kw: convex_client.update_pass_results(
+            "T1", [{"pass": 1, "developersFound": 3, "avgMatchConfidence": 70}], **kw),
+            "update-pass-results"),
+    }
+    return calls[name]
+
+
+WRITES = ["claim", "failed", "complete", "jd_profile", "pass_results"]
+
+
+@pytest.fixture
+def task_backend(backend, monkeypatch):
+    backend.answer = (200, {"ok": True})
+    monkeypatch.setattr(convex_client, "get_task", lambda task_id: {"passResults": []})
+    return backend
+
+
+@pytest.mark.parametrize("name", WRITES)
+def test_every_pipeline_write_carries_the_runs_claim_id(task_backend, name):
+    write, route = _write(name)
+    write()
+    [(url, body)] = task_backend.calls
+    assert url == f"{convex_client.CONVEX_URL}/api/{route}"
+    assert body["claimId"] == "run-a"
+
+
+@pytest.mark.parametrize("name", ["claim", "failed"])
+def test_an_explicit_claim_id_wins_over_the_runs(task_backend, name):
+    write, _ = _write(name)
+    write(claim_id="worker-claim")
+    [(_, body)] = task_backend.calls
+    assert body["claimId"] == "worker-claim"
+
+
+@pytest.mark.parametrize("name", [w for w in WRITES if w != "claim"])
+def test_a_write_refused_for_a_lost_claim_raises_claim_lost(task_backend, name):
+    task_backend.answer = (409, {"code": "claim_lost", "status": "processing",
+                                 "reason": "another run claimed the search"})
+    write, _ = _write(name)
+    with pytest.raises(convex_client.ClaimLost):
+        write()
+
+
+@pytest.mark.parametrize("name", WRITES)
+def test_a_write_to_a_deleted_search_raises_task_not_found(task_backend, name):
+    task_backend.answer = (404, {"error": "Task not found", "code": "task_not_found"})
+    write, _ = _write(name)
+    with pytest.raises(convex_client.TaskNotFound):
+        write()
+
+
+def _get_answers(monkeypatch, status, body):
+    monkeypatch.setattr(convex_client.requests, "get", lambda url, **kwargs: _response(status, body))
+
+
+def test_get_task_raises_task_not_found_for_a_deleted_search(monkeypatch):
+    _get_answers(monkeypatch, 404, {"error": "Task not found", "code": "task_not_found"})
+    with pytest.raises(convex_client.TaskNotFound):
+        convex_client.get_task("T1")
+
+
+def test_get_task_without_the_not_found_code_is_an_http_error(monkeypatch):
+    _get_answers(monkeypatch, 404, {})
+    with pytest.raises(requests.exceptions.HTTPError):
+        convex_client.get_task("T1")
+
+
+def test_pass_results_for_a_deleted_search_raises_task_not_found(backend, monkeypatch):
+    def deleted(task_id):
+        raise convex_client.TaskNotFound(task_id)
+
+    monkeypatch.setattr(convex_client, "get_task", deleted)
+    with pytest.raises(convex_client.TaskNotFound):
+        convex_client.update_pass_results("T1", [{"pass": 1, "developersFound": 3, "avgMatchConfidence": 70}])
+    assert backend.calls == []

@@ -176,6 +176,7 @@ update_jd_profile('${taskId}', jd_profile)
 print('JD Profile pushed to Convex')
 "
 ```
+A write that reports the claim lost: follow the **Lost claim** rule in `skill/skills/github-hr-run/SKILL.md`.
 
 ### Step 5: Log summary
 

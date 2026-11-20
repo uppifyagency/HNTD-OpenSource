@@ -21,8 +21,8 @@ stateDiagram-v2
   s4: Completed, shortlist shown
   s5: Deleted, the pipeline still works on it
   s6: Failed
-  s7: In queue, a run still works on it
-  s8: Processing, no pipeline run alive
+  s7: In queue, a run that lost the claim still works
+  s8: Processing, the run that holds it is gone
   [*] --> s0
   s0 --> s1: you start a search
   s1 --> s3: a pipeline run claims it
@@ -32,11 +32,9 @@ stateDiagram-v2
   s3 --> s7: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
   s3 --> s8: the Claude Code session ends mid-run
   s4 --> s1: you reset it from the terminal
-  s5 --> s2: the run stops, the search is gone
+  s5 --> s2: the run stops, the search is gone or the Claude Code session ends mid-run
   s6 --> s1: you reset it from the terminal
-  s7 --> s1: the Claude Code session ends mid-run
-  s7 --> s4: the run delivers the shortlist
-  s7 --> s6: the run reports a failure
+  s7 --> s1: the run's next write is refused [claim lost], it stops or the Claude Code session ends mid-run
   s8 --> s1: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
   class s0 tan
   class s1 tan

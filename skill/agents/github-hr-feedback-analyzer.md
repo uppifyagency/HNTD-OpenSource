@@ -87,6 +87,7 @@ update_pass_results('{taskId}', [{{
 print('Pass results updated on Convex')
 "
 ```
+A write that reports the claim lost: follow the **Lost claim** rule in `skill/skills/github-hr-run/SKILL.md`.
 
 ### Step 4: Make decision
 

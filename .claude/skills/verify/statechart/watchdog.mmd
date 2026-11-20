@@ -8,18 +8,12 @@ stateDiagram-v2
     lg2: done
     lg3: failed
     lg4: gone
-    lg5: Breaks OneRunAtATime
-    lg6: Breaks OneRunAtATime in some cases
-    lg7: Path to the OneRunAtATime bug
   }
   class lg0 tan
   class lg1 blue
   class lg2 teal
   class lg3 orange
   class lg4 purple
-  class lg5 breaks
-  class lg6 mayBreak
-  class lg7 bugPath
   s0: No search yet
   s1: In queue
   s2: Deleted
@@ -27,12 +21,12 @@ stateDiagram-v2
   s4: Completed, shortlist shown
   s5: Deleted, the pipeline still works on it
   s6: Failed
-  s7: In queue, a run still works on it
-  s8: Processing, no pipeline run alive
-  s9: Processing, two runs at once
-  s10: Completed, a run still works on it
-  s11: Failed, a run still works on it
-  s12: In queue, a run still works on it, two runs at once
+  s7: In queue, a run that lost the claim still works
+  s8: Processing, the run that holds it is gone
+  s9: Processing, a run that lost the claim still works
+  s10: Completed, a run that lost the claim still works
+  s11: Failed, a run that lost the claim still works
+  s12: Processing, the run that holds it is gone, a run that lost the claim still works
   [*] --> s0
   s0 --> s1: you start a search
   s1 --> s3: a pipeline run claims it
@@ -42,46 +36,34 @@ stateDiagram-v2
   s3 --> s7: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
   s3 --> s8: the Claude Code session ends mid-run
   s4 --> s1: you reset it from the terminal
-  s5 --> s2: the run stops, the search is gone
+  s5 --> s2: the run stops, the search is gone or the Claude Code session ends mid-run
   s6 --> s1: you reset it from the terminal
-  s7 --> s1: the Claude Code session ends mid-run
-  s7 --> s4: the run delivers the shortlist
-  s7 --> s6: the run reports a failure
+  s7 --> s1: the run's next write is refused [claim lost], it stops or the Claude Code session ends mid-run
   s7 --> s9: a pipeline run claims it
   s8 --> s1: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
-  s9 --> s3: the Claude Code session ends mid-run
+  s9 --> s3: the run's next write is refused [claim lost], it stops or the Claude Code session ends mid-run
   s9 --> s10: the run delivers the shortlist
   s9 --> s5: you delete the search
   s9 --> s11: the run reports a failure
-  s9 --> s12: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
-  s10 --> s4: the Claude Code session ends mid-run or the run's failure is refused or the run delivers the shortlist
+  s9 --> s7: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
+  s9 --> s12: the Claude Code session ends mid-run
+  s10 --> s4: the run's next write is refused [claim lost], it stops or the Claude Code session ends mid-run
   s10 --> s7: you reset it from the terminal
-  s11 --> s4: the run delivers the shortlist
-  s11 --> s6: the Claude Code session ends mid-run or the run reports a failure
+  s11 --> s6: the run's next write is refused [claim lost], it stops or the Claude Code session ends mid-run
   s11 --> s7: you reset it from the terminal
-  s12 --> s7: the Claude Code session ends mid-run
-  s12 --> s10: the run delivers the shortlist
-  s12 --> s11: the run reports a failure
-  classDef breaks fill:#ffecee,stroke:#e72e3b,stroke-width:2.5px,color:#cd2834
-  classDef mayBreak fill:#fff3e6,stroke:#e8730c,stroke-width:2.5px,color:#b85a06
+  s12 --> s8: the run's next write is refused [claim lost], it stops or the Claude Code session ends mid-run
+  s12 --> s5: you delete the search
+  s12 --> s7: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
   class s0 tan
-  class s0 bugPath
   class s1 tan
-  class s1 bugPath
   class s2 purple
   class s3 blue
-  class s3 bugPath
   class s4 teal
   class s5 purple
-  class s5 mayBreak
   class s6 orange
   class s7 tan
-  class s7 bugPath
   class s8 blue
   class s9 blue
-  class s9 breaks
-  class s9 bugPath
   class s10 teal
   class s11 orange
-  class s12 tan
-  class s12 breaks
+  class s12 blue

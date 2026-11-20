@@ -2,12 +2,13 @@
 
 Started by `npm run local` (scripts/local/run.sh) with the pipeline's venv python. Each loop it
 asks the LOCAL backend for pending tasks, checks that the pipeline can reach GitHub, claims the
-oldest task (pending -> processing, refused if another run took it first), and runs
-`claude -p "/github-hr run --task <id>"` in the repo with HNTD_CLAIMED_TASK=<id>.
-A run that ends without completing or failing the task is marked failed, so the dashboard never
-shows a search stuck in the queue.
+oldest task (pending -> processing, refused if another run took it first) with a new claim id,
+and runs `claude -p "/github-hr run --task <id>"` in the repo with HNTD_CLAIM_ID=<claim id>, so
+every write of the run carries the worker's claim. A run that ends without completing or failing
+the task is marked failed, so the dashboard never shows a search stuck in the queue. A write
+refused because the claim was lost (a requeue or a reset, then another run's claim) ends the turn.
 
-Crash safety: the claimed task id is written to INFLIGHT before claude starts. A worker that
+Crash safety: the task id and claim id are written to INFLIGHT before claude starts. A worker that
 starts and finds INFLIGHT marks that task failed (if it is not finished) instead of running it
 again, so a crash never runs a task twice. One worker per checkout: STATE_DIR/worker.lock.
 
@@ -20,9 +21,8 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
-
-import requests
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILL_ENV = ROOT / "skill" / "scripts" / ".env"
@@ -233,31 +233,32 @@ def redact_token(log_path: Path, token: str | None) -> str:
     return text
 
 
-def run_claude(task_id: str, log_path: Path) -> dict:
+def run_claude(task_id: str, claim_id: str, log_path: Path) -> dict:
     """Run the pipeline for one task. Returns the CLI's final `result` message (or {})."""
     cmd = claude_command(f"/github-hr run --task {task_id}")
-    # The run's own `convex_client.py claim` sees that this worker already holds the task.
-    env = dict(pipeline_env(), **{convex_client.CLAIMED_BY_WORKER_ENV: task_id})
+    env = dict(pipeline_env(), **{convex_client.CLAIM_ID_ENV: claim_id})
     with log_path.open("w") as out:
         proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=out,
                                 stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
-        write_json(INFLIGHT, {"taskId": task_id, "pid": proc.pid})
+        write_json(INFLIGHT, {"taskId": task_id, "pid": proc.pid, "claimId": claim_id})
         proc.wait()
     return final_result(redact_token(log_path, env.get("GH_TOKEN")))
 
 
-def fail_if_unfinished(task_id: str, reason: str) -> None:
-    """Mark the task failed unless it is finished. A deleted search (the backend answers 404)
-    counts as finished. Any other error propagates, so the caller keeps INFLIGHT and retries."""
+def fail_if_unfinished(task_id: str, claim_id: str, reason: str) -> None:
+    """Mark the task failed unless it is finished. A deleted search and a lost claim count as
+    finished. Any other error propagates, so the caller keeps INFLIGHT and retries."""
     try:
         status = convex_client.get_task(task_id).get("status")
-    except requests.HTTPError as exc:
-        if exc.response is None or exc.response.status_code != 404:
-            raise
+    except convex_client.TaskNotFound:
         log(f"{task_id}: the search was deleted, nothing to mark failed")
         return
     if status not in FINISHED:
-        convex_client.update_task_status(task_id, "failed", reason)
+        try:
+            convex_client.update_task_status(task_id, "failed", reason, claim_id=claim_id)
+        except convex_client.ClaimLost as exc:
+            log(f"{task_id}: not marked failed, another run or a requeue or reset took the search ({exc})")
+            return
         log(f"{task_id}: {status} -> failed ({reason[:120]})")
 
 
@@ -277,16 +278,22 @@ def recover_inflight() -> None:
     log_path = LOG_DIR / f"{data['taskId']}.jsonl"
     if log_path.exists():
         redact_token(log_path, pipeline_env().get("GH_TOKEN"))
-    fail_if_unfinished(data["taskId"], "Interrotta: il worker locale si e' fermato durante "
-                                       "l'elaborazione. Crea di nuovo la ricerca per riprovare.")
+    if data.get("claimId"):
+        fail_if_unfinished(data["taskId"], data["claimId"],
+                           "Interrotta: il worker locale si e' fermato durante l'elaborazione. "
+                           "Crea di nuovo la ricerca per riprovare.")
+    else:  # an older worker wrote INFLIGHT without its claim: nothing it may write any more
+        log(f"{data['taskId']}: left by a worker that recorded no claim id, so it stays processing; "
+            f"run /github-hr reset {data['taskId']} to queue it again")
     INFLIGHT.unlink()
 
 
 def process(task_id: str, github: dict) -> bool:
     """Claim the task and run it. False when the claim was not granted and nothing ran."""
-    write_json(INFLIGHT, {"taskId": task_id, "pid": None})
+    claim_id = str(uuid.uuid4())
+    write_json(INFLIGHT, {"taskId": task_id, "pid": None, "claimId": claim_id})
     try:
-        claim = convex_client.claim_task(task_id)
+        claim = convex_client.claim_task(task_id, claim_id)
     except convex_client.TaskNotFound:
         log(f"{task_id}: not claimed, the search was deleted")
         INFLIGHT.unlink()
@@ -299,12 +306,12 @@ def process(task_id: str, github: dict) -> bool:
     write_status("running", github, taskId=task_id, log=str(log_path.relative_to(ROOT)))
     log(f"{task_id}: running claude {' '.join(model_args()) or '(default model)'}, log {log_path}")
     started = time.time()
-    final = run_claude(task_id, log_path)
+    final = run_claude(task_id, claim_id, log_path)
     log(f"{task_id}: claude exited after {time.time() - started:.0f}s, "
         f"cost_usd={final.get('total_cost_usd')}, is_error={final.get('is_error')}, "
         f"denied_tool_calls={len(final.get('permission_denials') or [])}")
     last = str(final.get("result") or "nessun messaggio finale").strip().replace("\n", " ")
-    fail_if_unfinished(task_id, f"La pipeline si e' fermata senza finire: {last[:400]} "
+    fail_if_unfinished(task_id, claim_id, f"La pipeline si e' fermata senza finire: {last[:400]} "
                                 f"(log: {log_path.relative_to(ROOT)})")
     INFLIGHT.unlink()
     return True
