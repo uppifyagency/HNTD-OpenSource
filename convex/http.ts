@@ -85,7 +85,6 @@ async function requireAuth(request: Request): Promise<Response | null> {
   return null;
 }
 
-// The claim token every pipeline write carries (issue #18).
 function isClaimId(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "" && value.length <= 128;
 }
@@ -94,14 +93,12 @@ const invalidClaimId = () =>
   Response.json({ error: "claimId must be a non-empty string of at most 128 characters" }, { status: 400 });
 
 function errorResponse(error: unknown, status = 500): Response {
-  // A write from a run that lost its claim (convex/taskTransitions.ts checkClaim) is a conflict
-  // with the search's state, not a server fault: the run must stop. ctx.runMutation rethrows the
-  // mutation's ConvexError with its data.
+  // ctx.runMutation rethrows the mutation's ConvexError with its data.
   if (error instanceof ConvexError && error.data?.code === "claim_lost") {
-    return new Response(JSON.stringify(error.data), {
-      status: 409,
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json(error.data, { status: 409 });
+  }
+  if (error instanceof ConvexError && error.data?.code === "task_not_found") {
+    return Response.json({ error: "Task not found", code: "task_not_found" }, { status: 404 });
   }
   const message = error instanceof Error ? error.message : "Internal server error";
   return new Response(JSON.stringify({ error: message }), {
@@ -389,7 +386,9 @@ http.route({
         });
       }
       if (!isSettableStatus(status)) {
-        return new Response(JSON.stringify({ error: `status must be one of: ${SETTABLE_STATUSES.join(", ")}` }), {
+        return new Response(JSON.stringify({
+          error: `status must be ${SETTABLE_STATUSES.join(" or ")}: claim-task starts a search and complete-task completes it`,
+        }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
@@ -468,7 +467,7 @@ http.route({
         taskId: taskId as Id<"tasks">,
       });
       if (!task) {
-        return new Response(JSON.stringify({ error: "Task not found" }), {
+        return new Response(JSON.stringify({ error: "Task not found", code: "task_not_found" }), {
           status: 404,
           headers: { "Content-Type": "application/json" },
         });
@@ -1226,10 +1225,8 @@ http.route({
 
       let recovered = 0;
       for (const task of tasks) {
-        // False when the search finished or was claimed again since the stale read.
-        if (!(await ctx.runMutation(internal.tasks.requeueStaleTask, { taskId: task._id, staleThresholdMs }))) {
-          continue;
-        }
+        const outcome = await ctx.runMutation(internal.tasks.requeueStaleTask, { taskId: task._id, staleThresholdMs });
+        if (outcome === "not_stale") continue;
         await ctx.runMutation(internal.pipelineLogs.insertLog, {
           taskId: task._id as string,
           phase: "watchdog",

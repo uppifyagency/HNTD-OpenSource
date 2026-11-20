@@ -8,12 +8,7 @@ import type { Doc } from "./_generated/dataModel";
 import { assertAdmin, requireCurrentUser, getAdminEmails } from "./users";
 import { canGrantAdmin } from "./adminAuthz";
 import { checkTaskQuota } from "./planLimits";
-import {
-  SETTABLE_STATUSES,
-  checkClaim,
-  checkStatusTransition,
-  type TaskStatus,
-} from "./taskTransitions";
+import { SETTABLE_STATUSES, claimRefusal } from "./taskTransitions";
 
 export const createTask = mutation({
   args: {
@@ -150,27 +145,18 @@ export const getPendingTasks = internalQuery({
   },
 });
 
-// A run that lost its claim must stop (issue #18): POST routes answer HTTP 409 `claim_lost`.
-function assertHoldsClaim(
-  task: Doc<"tasks"> | null,
-  claimId: string,
-  to?: TaskStatus
-): asserts task is Doc<"tasks"> {
-  const verdict = task
-    ? checkClaim(task, claimId, to)
-    : { allowed: false as const, reason: "the search was deleted" };
-  if (!verdict.allowed) {
-    throw new ConvexError({ code: "claim_lost", reason: verdict.reason, status: task?.status ?? null });
-  }
+function assertHoldsClaim(task: Doc<"tasks"> | null, claimId: string): asserts task is Doc<"tasks"> {
+  const refusal = claimRefusal(task, claimId);
+  if (refusal) throw new ConvexError(refusal);
 }
 
 function truncateError(error: string | undefined) {
   return error && error.length > 2000 ? error.slice(0, 2000) + "... [truncated]" : error;
 }
 
-// The run holding the claim hands its search back (`pending`) or fails it (`failed`); only
-// `claimTask` starts a search and only `completeTask` completes one. `failed` keeps the claim, so
-// the same run repeating the write after a lost response is recognised.
+// The run holding the claim fails its search; only `claimTask` starts a search and only
+// `completeTask` completes one. `failed` keeps the claim, so the same run repeating the write
+// after a lost response is recognised.
 export const updateTaskStatus = internalMutation({
   args: {
     taskId: v.id("tasks"),
@@ -180,15 +166,15 @@ export const updateTaskStatus = internalMutation({
   },
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
-    assertHoldsClaim(task, args.claimId, args.status);
+    if (task?.status === args.status && task.claimId === args.claimId) return;
+    assertHoldsClaim(task, args.claimId);
 
-    const updates: Partial<Doc<"tasks">> = { status: args.status, processingStartedAt: undefined };
-    if (args.status === "pending") {
-      updates.claimId = undefined;
-    }
     const errorMsg = truncateError(args.error);
-    if (errorMsg) updates.error = errorMsg;
-    await ctx.db.patch(args.taskId, updates);
+    await ctx.db.patch(args.taskId, {
+      status: args.status,
+      processingStartedAt: undefined,
+      ...(errorMsg ? { error: errorMsg } : {}),
+    });
   },
 });
 
@@ -216,9 +202,7 @@ export const claimTask = internalMutation({
     if (task.status === "processing" && task.claimId === args.claimId) {
       return { outcome: "claimed" as const };
     }
-    if (!checkStatusTransition(task.status, "processing").allowed) {
-      return { outcome: "refused" as const, status: task.status };
-    }
+    if (task.status !== "pending") return { outcome: "refused" as const, status: task.status };
     await ctx.db.patch(args.taskId, { status: "processing", processingStartedAt: Date.now(), claimId: args.claimId });
     return { outcome: "claimed" as const };
   },
@@ -655,7 +639,6 @@ export const internalGetJobsDashboard = internalQuery({
   },
 });
 
-// When a stale search started processing, or null when it is not stale.
 function staleSince(task: Doc<"tasks">, staleThresholdMs: number, now: number): number | null {
   const startedAt = task.status === "processing" ? task.processingStartedAt : undefined;
   return startedAt !== undefined && now - startedAt > staleThresholdMs ? startedAt : null;
@@ -678,17 +661,17 @@ export const getStaleProcessingTasks = internalQuery({
 // makes every later write of the old run fail with `claim_lost`.
 export const requeueStaleTask = internalMutation({
   args: { taskId: v.id("tasks"), staleThresholdMs: v.number() },
-  returns: v.boolean(),
+  returns: v.union(v.literal("requeued"), v.literal("not_stale")),
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     const since = task && staleSince(task, args.staleThresholdMs, Date.now());
-    if (since === null) return false;
+    if (since === null) return "not_stale" as const;
     await ctx.db.patch(args.taskId, {
       status: "pending",
       claimId: undefined,
       processingStartedAt: undefined,
       error: `Auto-recovered: stuck processing since ${new Date(since).toISOString()}`,
     });
-    return true;
+    return "requeued" as const;
   },
 });
