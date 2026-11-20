@@ -194,6 +194,17 @@ def test_a_run_that_no_longer_holds_the_search_pushes_nothing(tmp_path, capsys, 
     assert "This run lost search T9" in capsys.readouterr().out
 
 
+def test_the_run_that_completed_the_search_can_push_again(tmp_path):
+    completed_by_us = _response(200, {"_id": "T9", "status": "completed", "claimId": "run-a"})
+    upserts = []
+    result, posts = _run_push(tmp_path, _response(200, {"ok": True}), failing=(),
+                              task=completed_by_us, upserts=upserts)
+
+    assert result is not False
+    assert upserts == ["alice", "bob"]
+    assert [route for route, _ in posts if route == "complete-task"] == ["complete-task"]
+
+
 def test_a_search_deleted_before_the_push_pushes_nothing(tmp_path, capsys):
     upserts = []
     deleted = _response(404, {"error": "Task not found", "code": "task_not_found"})

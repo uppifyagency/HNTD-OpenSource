@@ -790,7 +790,8 @@ def main():
             print(_DELETED.format(task_id=TASK_ID))
             return False
         status = task.get("status")
-        if status != "processing" or task.get("claimId") != run_claim_id():
+        # The run that completed the search keeps its claim, so it may push again.
+        if status not in ("processing", "completed") or task.get("claimId") != run_claim_id():
             why = "another run holds it" if status == "processing" else f"the search is {status}"
             print(_LOST.format(task_id=TASK_ID, why=why))
             return False
