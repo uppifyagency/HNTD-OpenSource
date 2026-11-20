@@ -45,9 +45,7 @@ This script:
 5. Calls `complete_task` with the developer ID list
 6. Writes summary to `skill/output/result-{taskId}.json`
 
-If it prints that this run lost the search to another run (HTTP 409 `claim_lost`), another run
-holds the search now: stop at once and report it. Do not retry, do not mark the task failed, do
-not reset it.
+A write that reports the claim lost: follow the **Lost claim** rule in `skill/skills/github-hr-run/SKILL.md`.
 
 **Pre-filter metadata behavior:**
 - If `prefilter-{taskId}.json` exists and is valid: each Pass 1 developer gets `prefilterMetadata` with `survived`, `prefilterBoost`, and `boostReasons`

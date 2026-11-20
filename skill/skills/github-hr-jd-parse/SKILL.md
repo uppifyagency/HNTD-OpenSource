@@ -10,7 +10,9 @@ Parse a raw job description into a structured JD Profile with search parameters 
 ## Usage
 
 Called by `/github-hr run` for tasks with `mode: "jd"` and no existing `jdProfile`.
-Can also be called standalone: `/github-hr jd-parse <TASK_ID>`
+Can also be called standalone: `/github-hr jd-parse <TASK_ID>`. Standalone, it claims the task
+first and leaves it `processing`, like `/github-hr fetch`: run `/github-hr reset <TASK_ID>` before
+a later `/github-hr run --task <TASK_ID>`.
 
 ## Input
 
@@ -19,16 +21,21 @@ Can also be called standalone: `/github-hr jd-parse <TASK_ID>`
 
 ## Process
 
+### Step 0: Claim the task (standalone only)
+
+Skip this step when `/github-hr run` called you: the run already holds the claim.
+
+```bash
+python skill/scripts/convex_client.py claim <TASK_ID>
+```
+- Exit 0: this session holds the task. Go on.
+- Any other exit: another run holds the task, or it is not pending, or it is gone. Do NOT work
+  on it and do NOT mark it failed. Print the command's output and stop.
+
 ### Step 1: Load task data
 
 ```bash
-python -c "
-from skill.scripts.convex_client import get_pending_tasks
-import json
-tasks = get_pending_tasks()
-task = next(t for t in tasks if t['_id'] == '<TASK_ID>')
-print(json.dumps(task, indent=2))
-"
+python skill/scripts/convex_client.py task <TASK_ID>
 ```
 
 Verify `task.mode === "jd"` and `task.jobDescription` is non-empty.
@@ -118,7 +125,7 @@ jd_profile = json.load(open('skill/output/jd-profile-<TASK_ID>.json'))
 update_jd_profile('<TASK_ID>', jd_profile)
 "
 ```
-If this write raises `ClaimLost` (HTTP 409 `claim_lost`), another run holds the search now: stop at once and report it. Do not retry, do not mark the task failed, do not reset it.
+A write that reports the claim lost: follow the **Lost claim** rule in `skill/skills/github-hr-run/SKILL.md`.
 
 ### Step 5: Log summary
 

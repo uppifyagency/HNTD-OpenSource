@@ -47,9 +47,7 @@ python skill/scripts/convex_client.py claim <TASK_ID>
 - Any other exit: another run holds the task, or it is not pending, or it is gone. Do NOT work
   on it and do NOT mark it failed. Print the command's output and stop.
 
-A later write that reports the claim lost (HTTP 409 `claim_lost`, `ClaimLost` in Python) means
-another run holds the search now: stop at once. Do not retry, do not mark it failed, do not
-reset it.
+A write that reports the claim lost: follow the **Lost claim** rule in `skill/skills/github-hr-run/SKILL.md`.
 
 ### Step 3: Check if fetch already exists
 

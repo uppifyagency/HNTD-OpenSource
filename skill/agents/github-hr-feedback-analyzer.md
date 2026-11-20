@@ -87,7 +87,7 @@ update_pass_results('{taskId}', [{{
 print('Pass results updated on Convex')
 "
 ```
-If this write raises `ClaimLost` (HTTP 409 `claim_lost`), another run holds the search now: stop at once and report it. Do not retry, do not mark the task failed, do not reset it.
+A write that reports the claim lost: follow the **Lost claim** rule in `skill/skills/github-hr-run/SKILL.md`.
 
 ### Step 4: Make decision
 

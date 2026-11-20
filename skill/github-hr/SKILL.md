@@ -69,6 +69,8 @@ Not recommended for large queues — use `--task` for dedicated sessions instead
 
 ### /github-hr jd-parse <TASK_ID>
 Parse JD into JD Profile (Phase 2 standalone). Load and follow `skill/skills/github-hr-jd-parse/SKILL.md`.
+It claims the task first (stop if the claim is refused) and leaves it `processing`: run
+`/github-hr reset <TASK_ID>` before a later `/github-hr run --task <TASK_ID>`.
 
 ### /github-hr fetch <TASK_ID>
 Fetch-only for a single task (Phase 1-3). Load and follow `skill/skills/github-hr-fetch/SKILL.md`.
@@ -78,11 +80,15 @@ It claims the task and leaves it `processing`: run `/github-hr reset <TASK_ID>` 
 
 ### /github-hr score <TASK_ID>
 Score-only for a single task (Phase 4). Load and follow `skill/skills/github-hr-score/SKILL.md`.
-Automatically skips already-completed batches. Use for recovery after scoring crash.
+Automatically skips already-completed batches. Use for recovery after scoring crash. Scoring writes
+only local files; to push the result from a new session, follow the recovery under push.
 
 ### /github-hr push <TASK_ID> [--dry-run]
 Push-only for a single task (Phase 7-8). Load and follow `skill/skills/github-hr-push/SKILL.md`.
-Safe to re-run (idempotent upsert by githubId).
+The push stores nothing unless this session holds the task's claim. After a crash, recover from a
+new session, all in that one session: `/github-hr reset <TASK_ID>`, then
+`python skill/scripts/convex_client.py claim <TASK_ID>`, then the push. Safe to re-run in the
+session that holds the claim (idempotent upsert by githubId).
 
 ### /github-hr rank \<TASK_ID\>
 Comparative re-evaluation for a single task (Phase 5). Load and follow `skill/skills/github-hr-rank/SKILL.md`.
