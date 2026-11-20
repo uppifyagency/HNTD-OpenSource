@@ -35,8 +35,8 @@ left: in every configuration, every rule holds.
 |---|---|---|
 | `NoResultsForDeletedSearch` | A deleted search leaves no shortlist behind. | Holds since `tasks.completeTask` |
 | `CompletedHasResults` | A search shown as completed has a shortlist. | Holds since `tasks.completeTask` |
-| `DeliveredStaysCompleted` | Once a shortlist is delivered, the search stays completed until you reset or delete it. | Holds since the transition table (`convex/taskTransitions.ts`) |
-| `OneWriterPerClaim` | Under one claim, the writes of only one pipeline run land on a search. | Holds since every pipeline write carries the claim token (`taskTransitions.checkClaim`) |
+| `DeliveredStaysCompleted` | Once a shortlist is delivered, the search stays completed until you reset or delete it. | Holds: a run writes only while the search is processing under its claim |
+| `OneWriterPerClaim` | Under one claim, the writes of only one pipeline run land on a search. | Holds since every pipeline write carries the claim token. Breaks in `no-token.cfg`, as it must |
 | `NoDeadlock` | No state is a dead end, apart from a deleted search. | Holds |
 
 ## The five breaks, all fixed
@@ -59,8 +59,8 @@ worker and a run started by hand are the same actor: whoever holds the claim.
    one write now, and `update-task-status` can no longer set `completed` at all (HTTP 400).
 3. **Failed after it had completed.** Fixed. Two runs read the same queued search, the first
    delivered the shortlist, and the second reported a failure that the backend accepted.
-   `convex/taskTransitions.ts` now refuses every change out of `completed` except `completed`
-   itself, and the late write gets HTTP 409. The model has the same rule and TLC lists
+   A run now writes only while the search is processing under its own claim, so the late write
+   gets HTTP 409 `claim_lost`. The model has the same rule and TLC lists
    `DeliveredStaysCompleted` under "Rules that hold".
 4. **Two runs on one search.** Fixed for the queue. A run used to read the queue and mark the
    search processing much later, and a second `processing` write was accepted. `tasks.claimTask`
@@ -76,8 +76,10 @@ worker and a run started by hand are the same actor: whoever holds the claim.
    `update-jd-profile`, `update-pass-results`, `complete-task`) carries it, and the backend
    answers HTTP 409 `claim_lost` when it is no longer the token on the search. The requeue and
    the reset clear it. The old run stops at its next write, so two runs can still be alive for a
-   while, but only one run's writes land. With the token check removed from the model, TLC finds
-   the issue's path: start, claim, requeue, a second claim, and the first run's write lands.
+   while, but only one run's writes land. `no-token.cfg` is the same model with the token check
+   off (`CheckToken = FALSE`). TLC must find the issue's path there
+   ([`no-token.report.md`](no-token.report.md)): start, claim, requeue, a second claim, and the
+   first run's write lands. If it stops finding it, `OneWriterPerClaim` no longer detects the bug.
 
 The watchdog still requeues by time only. It does not extend the deadline while a run keeps
 writing: the claimed writes come at the claim, after JD parsing, after each pass and at the
@@ -111,11 +113,13 @@ STATECHART=<pstack plugin>/skills/statechart/scripts/statechart
 $STATECHART SearchLifecycle.tla --config one-run.cfg --view view.mjs --out /tmp/hntd-lifecycle
 $STATECHART SearchLifecycle.tla --config race.cfg --view view-race.mjs --out /tmp/hntd-two-runs
 $STATECHART SearchLifecycle.tla --config watchdog.cfg --view view.mjs --out /tmp/hntd-watchdog
+$STATECHART SearchLifecycle.tla --config no-token.cfg --view view.mjs --out /tmp/hntd-no-token  # must break
 ```
 
 `--out` must be a new or empty folder. The command needs `mise`, or `TLA2TOOLS` set to a
 `tla2tools.jar` (v1.7.4) and `JAVA` set to a Java 11 or later. Copy `chart.mmd` and `report.md`
-back here under the names above, and render each `.mmd` to `.svg` with `pele@1.9.0`.
+back here under the names above, and render each `.mmd` to `.svg` with `pele@1.9.0`. For
+`no-token.cfg`, copy only `report.md`, as `no-token.report.md`.
 
 Update the model when `convex/tasks.ts`, `convex/taskTransitions.ts`, `convex/taskResults.ts`,
 the task routes in `convex/http.ts`, or the status calls in `skill/skills/github-hr-run/SKILL.md`

@@ -32,7 +32,7 @@ stateDiagram-v2
   s3 --> s7: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal
   s3 --> s8: the Claude Code session ends mid-run
   s4 --> s1: you reset it from the terminal
-  s5 --> s2: the run's next write is refused [claim lost], it stops or the Claude Code session ends mid-run
+  s5 --> s2: the run stops, the search is gone or the Claude Code session ends mid-run
   s6 --> s1: you reset it from the terminal
   s7 --> s1: the run's next write is refused [claim lost], it stops or the Claude Code session ends mid-run
   s8 --> s1: the watchdog requeues it [30 minutes in processing] or you reset it from the terminal

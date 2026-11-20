@@ -5,7 +5,8 @@
 (* skill/scripts/push_results.py.                                              *)
 EXTENDS Naturals
 
-CONSTANT Runs  \* pipeline runs that can be alive at once (Claude Code sessions, cron)
+CONSTANT Runs       \* pipeline runs that can be alive at once (Claude Code sessions, cron)
+CONSTANT CheckToken \* TRUE: the backend refuses a stale claim token. FALSE: the same backend without that check.
 
 VARIABLES
   search,     \* what the dashboard shows: none, pending, processing, completed, failed, deleted
@@ -24,8 +25,8 @@ Exists == search \in {"pending", "processing", "completed", "failed"}
 Set(r, to) == run' = [run EXCEPT ![r] = to]
 
 \* Every pipeline write carries the run's claim token. The backend accepts it only while the
-\* search is processing and the token is still the one on the search (taskTransitions.checkClaim).
-Holds(r) == search = "processing" /\ holder = r
+\* search is processing and the token is still the one on the search.
+Holds(r) == search = "processing" /\ (holder = r \/ ~CheckToken)
 Lands(r) == /\ writer' = r
             /\ clash' = (clash \/ writer \notin {NoRun, r})
 

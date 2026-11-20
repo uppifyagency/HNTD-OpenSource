@@ -4,6 +4,8 @@ const working = (v) => runs(v).filter(([, s]) => s === "working").length;
 // Runs still working on a search whose claim they no longer hold.
 const lost = (v) => runs(v).filter(([r, s]) => s === "working" && String(v.holder) !== r).length;
 const refused = (from, to) => working(to) < working(from) && from.search === to.search;
+const refusal = (from) =>
+  from.search === "deleted" ? "the run stops, the search is gone" : "the run's next write is refused [claim lost], it stops";
 
 export const title = "HNTD search: from the form to the shortlist";
 
@@ -42,13 +44,13 @@ export const step = (action, from, to) => {
     case "RunClaims":
       return "a pipeline run claims it";
     case "RunWrites":
-      return refused(from, to) ? "the run's next write is refused [claim lost], it stops" : "the run saves progress [JD profile, pass results]";
+      return refused(from, to) ? refusal(from) : "the run saves progress [JD profile, pass results]";
     case "RunReportsFailure":
-      return refused(from, to) ? "the run's next write is refused [claim lost], it stops" : "the run reports a failure";
+      return refused(from, to) ? refusal(from) : "the run reports a failure";
     case "RunDies":
       return "the Claude Code session ends mid-run";
     case "RunCompletes":
-      return refused(from, to) ? "the run's next write is refused [claim lost], it stops" : "the run delivers the shortlist";
+      return refused(from, to) ? refusal(from) : "the run delivers the shortlist";
     case "WatchdogRequeues":
       return "the watchdog requeues it [30 minutes in processing]";
     default:
