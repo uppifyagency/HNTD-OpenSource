@@ -214,9 +214,9 @@ def test_a_404_from_a_backend_without_the_route_is_not_a_deleted_task(backend):
         convex_client.claim_task("T1")
 
 
-# Issue #18: after a requeue or a reset a second run claims the search while the first is still
-# alive. Every pipeline write carries the run's claim token, and the backend refuses (HTTP 409,
-# code claim_lost) a write from a run that no longer holds the search.
+# After a requeue or a reset a second run claims the search while the first is still alive.
+# Every pipeline write carries the run's claim token, and the backend refuses (HTTP 409, code
+# claim_lost) a write from a run that no longer holds the search.
 
 def test_run_claim_id_prefers_hntd_claim_id(monkeypatch):
     monkeypatch.setenv("HNTD_CLAIM_ID", "worker-claim")
@@ -272,7 +272,7 @@ def test_every_pipeline_write_carries_the_runs_claim_id(task_backend, name):
     assert body["claimId"] == "run-a"
 
 
-@pytest.mark.parametrize("name", WRITES)
+@pytest.mark.parametrize("name", ["claim", "failed"])
 def test_an_explicit_claim_id_wins_over_the_runs(task_backend, name):
     write, _ = _write(name)
     write(claim_id="worker-claim")
@@ -287,3 +287,37 @@ def test_a_write_refused_for_a_lost_claim_raises_claim_lost(task_backend, name):
     write, _ = _write(name)
     with pytest.raises(convex_client.ClaimLost):
         write()
+
+
+@pytest.mark.parametrize("name", WRITES)
+def test_a_write_to_a_deleted_search_raises_task_not_found(task_backend, name):
+    task_backend.answer = (404, {"error": "Task not found", "code": "task_not_found"})
+    write, _ = _write(name)
+    with pytest.raises(convex_client.TaskNotFound):
+        write()
+
+
+def _get_answers(monkeypatch, status, body):
+    monkeypatch.setattr(convex_client.requests, "get", lambda url, **kwargs: _response(status, body))
+
+
+def test_get_task_raises_task_not_found_for_a_deleted_search(monkeypatch):
+    _get_answers(monkeypatch, 404, {"error": "Task not found", "code": "task_not_found"})
+    with pytest.raises(convex_client.TaskNotFound):
+        convex_client.get_task("T1")
+
+
+def test_get_task_without_the_not_found_code_is_an_http_error(monkeypatch):
+    _get_answers(monkeypatch, 404, {})
+    with pytest.raises(requests.exceptions.HTTPError):
+        convex_client.get_task("T1")
+
+
+def test_pass_results_for_a_deleted_search_raises_task_not_found(backend, monkeypatch):
+    def deleted(task_id):
+        raise convex_client.TaskNotFound(task_id)
+
+    monkeypatch.setattr(convex_client, "get_task", deleted)
+    with pytest.raises(convex_client.TaskNotFound):
+        convex_client.update_pass_results("T1", [{"pass": 1, "developersFound": 3, "avgMatchConfidence": 70}])
+    assert backend.calls == []

@@ -77,8 +77,8 @@ class TaskNotFound(Exception):
 
 
 class ClaimLost(Exception):
-    """The backend refused a write: another run holds the search now (issue #18). The run must
-    stop: no retry, no failed status, no reset."""
+    """The backend refused a write: another run holds the search now. The run must stop: no
+    retry, no failed status, no reset."""
 
     def __init__(self, task_id: str, reason: str):
         super().__init__(f"{task_id}: {reason}")
@@ -88,7 +88,7 @@ class NoRunIdentity(Exception):
     pass
 
 
-CLAIM_ID_ENV = "HNTD_CLAIM_ID"  # set by scripts/local/worker.py for the run it starts
+CLAIM_ID_ENV = "HNTD_CLAIM_ID"
 
 
 def run_claim_id() -> str:
@@ -104,14 +104,14 @@ def run_claim_id() -> str:
                         "Claude Code (CLAUDE_CODE_SESSION_ID).")
 
 
-def _post_task(route: str, body: dict):
-    """POST to a task route. Raises TaskNotFound when the backend says the task is gone, and
+def _task_request(method, route: str, task_id: str, **kwargs):
+    """A request about one task. Raises TaskNotFound when the backend says the task is gone, and
     ClaimLost when it refuses the write because this run no longer holds the task.
 
     Only the route's own answer counts (its `code`): a backend that does not serve the route yet
     also answers 404, and that is an error, not a deleted task."""
     try:
-        return _request_with_retry(requests.post, f"{CONVEX_URL}{route}", json=body)
+        return _request_with_retry(method, f"{CONVEX_URL}{route}", **kwargs)
     except requests.exceptions.HTTPError as exc:
         resp = exc.response
         if resp is not None and resp.status_code in (404, 409):
@@ -120,16 +120,22 @@ def _post_task(route: str, body: dict):
             except ValueError:
                 answer = {}
             if resp.status_code == 404 and answer.get("code") == "task_not_found":
-                raise TaskNotFound(body["taskId"]) from exc
+                raise TaskNotFound(task_id) from exc
             if resp.status_code == 409 and answer.get("code") == "claim_lost":
-                raise ClaimLost(body["taskId"], answer.get("reason", "claim lost")) from exc
+                raise ClaimLost(task_id, answer.get("reason", "claim lost")) from exc
         raise
 
 
-def complete_task(task_id: str, developer_ids: list[str], error: str = None, claim_id: str = None):
+def _post_task(route: str, body: dict, claim_id: str = None):
+    """POST a pipeline write under this run's claim, or under `claim_id`."""
+    body["claimId"] = claim_id or run_claim_id()
+    return _task_request(requests.post, route, body["taskId"], json=body)
+
+
+def complete_task(task_id: str, developer_ids: list[str], error: str = None):
     """Store the result list and complete the task in one backend transaction. `error` is an
     optional note kept on the task. Raises TaskNotFound, storing nothing, if the task is gone."""
-    body = {"taskId": task_id, "claimId": claim_id or run_claim_id(), "developerIds": developer_ids}
+    body = {"taskId": task_id, "developerIds": developer_ids}
     if error:
         body["error"] = error
     return _post_task("/api/complete-task", body).json()
@@ -139,7 +145,7 @@ def claim_task(task_id: str, claim_id: str = None) -> dict:
     """Returns {"claimed": True}, or {"claimed": False, "status": <current status>} when the task
     is not pending. The run that already holds the claim is answered {"claimed": True} again.
     Raises TaskNotFound when it is gone."""
-    return _post_task("/api/claim-task", {"taskId": task_id, "claimId": claim_id or run_claim_id()}).json()
+    return _post_task("/api/claim-task", {"taskId": task_id}, claim_id).json()
 
 
 def claim_command(task_id: str) -> int:
@@ -164,18 +170,16 @@ def claim_command(task_id: str) -> int:
 
 
 def update_task_status(task_id: str, status: str, error: str = None, claim_id: str = None):
-    """Set a task to pending or failed. claim_task starts a task, complete_task completes it."""
-    body = {"taskId": task_id, "claimId": claim_id or run_claim_id(), "status": status}
+    """Fail a task. claim_task starts a task, complete_task completes it."""
+    body = {"taskId": task_id, "status": status}
     if error:
         body["error"] = error
-    return _post_task("/api/update-task-status", body).json()
+    return _post_task("/api/update-task-status", body, claim_id).json()
 
 
 def get_task(task_id: str) -> dict:
-    """Fetch a single task by ID from Convex."""
-    resp = _request_with_retry(requests.get, f"{CONVEX_URL}/api/get-task",
-                               params={"taskId": task_id})
-    return resp.json()
+    """Fetch a single task by ID from Convex. Raises TaskNotFound when it is gone."""
+    return _task_request(requests.get, "/api/get-task", task_id, params={"taskId": task_id}).json()
 
 
 def get_jobs_dashboard() -> list:
@@ -253,12 +257,11 @@ def reconstruct_jd_profile_file(task_id: str, output_dir: str = None):
     return write_jd_profile_file(task_id, profile, output_dir or _OUTPUT_DIR)
 
 
-def update_jd_profile(task_id: str, jd_profile: dict, claim_id: str = None) -> dict:
+def update_jd_profile(task_id: str, jd_profile: dict) -> dict:
     """Update a task's JD Profile after parsing (JD-02 #24: now persists
     searchStrategies + locationHard via _build_jd_profile)."""
     payload = _strip_none({
         "taskId": task_id,
-        "claimId": claim_id or run_claim_id(),
         "jdProfile": _build_jd_profile(jd_profile),
     })
     return _post_task("/api/update-jd-profile", payload).json()
@@ -364,7 +367,7 @@ def log_pipeline_event(task_id: str, phase: str, message: str,
         return {"ok": False}
 
 
-def update_pass_results(task_id: str, pass_results: list, claim_id: str = None) -> dict:
+def update_pass_results(task_id: str, pass_results: list) -> dict:
     """Update a task's pass results after feedback analysis.
     Appends/merges new pass entries into the existing passResults array
     so that Pass 1 data is preserved when Pass 2 is saved.
@@ -375,6 +378,8 @@ def update_pass_results(task_id: str, pass_results: list, claim_id: str = None) 
     try:
         existing_task = get_task(task_id)
         existing = existing_task.get("passResults") or []
+    except TaskNotFound:
+        raise
     except Exception as e:
         print(f"  [WARN] update_pass_results: cannot read existing passResults ({e}); "
               f"skipping update to avoid overwriting prior passes")
@@ -386,14 +391,10 @@ def update_pass_results(task_id: str, pass_results: list, claim_id: str = None) 
         merged[pr["pass"]] = pr
     merged_list = sorted(merged.values(), key=lambda x: x["pass"])
 
-    payload = {
-        "taskId": task_id,
-        "claimId": claim_id or run_claim_id(),
-        "passResults": merged_list,
-    }
+    payload = {"taskId": task_id, "passResults": merged_list}
     try:
         return _post_task("/api/update-pass-results", payload).json()
-    except ClaimLost:
+    except (ClaimLost, TaskNotFound):
         raise
     except Exception as e:
         print(f"  [ERROR] update_pass_results failed: {e}")

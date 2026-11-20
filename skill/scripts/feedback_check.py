@@ -284,7 +284,6 @@ def main():
     # JD-14: persist the pass outcome to Convex (best-effort — the endpoint
     # existed since day one but nothing ever called it, leaving the dashboard
     # blind on why a pass2 ran). Never fail the pipeline on a network error.
-    # A lost claim (issue #18) is not best-effort: another run holds the search, so this one stops.
     # NOTE: avgMatchConfidence carries the MEDIAN (the decision metric) when
     # available; refinementReason spells that out.
     try:

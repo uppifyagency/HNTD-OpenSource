@@ -72,6 +72,8 @@ def test_merge_with_absent_provenance_is_a_safe_noop():
 
 from unittest.mock import MagicMock, patch  # noqa: E402
 
+import pytest  # noqa: E402
+
 import requests  # noqa: E402
 
 
@@ -85,11 +87,16 @@ def _response(status, body):
     return resp
 
 
-def _run_push(tmp_path, complete_response, failing=("bob",)):
-    """Push alice and bob; the upsert of each login in `failing` raises.
+HELD = _response(200, {"_id": "T9", "status": "processing", "claimId": "run-a"})
+
+
+def _run_push(tmp_path, complete_response, failing=("bob",), task=HELD, upserts=None):
+    """Push alice and bob; the upsert of each login in `failing` raises. `task` is what
+    get-task answers, and `upserts` collects every upserted login.
 
     Returns (main() result, [(route, json body)] of every POST)."""
     posts = []
+    upserts = [] if upserts is None else upserts
 
     def fake_post(url, **kwargs):
         posts.append((url.rsplit("/api/", 1)[-1], kwargs.get("json")))
@@ -98,6 +105,7 @@ def _run_push(tmp_path, complete_response, failing=("bob",)):
         return _response(200, {"ok": True})
 
     def fake_upsert(payload):
+        upserts.append(payload["login"])
         if payload["login"] in failing:
             raise RuntimeError("upsert failed")
         return f"dev-{payload['login']}"
@@ -112,6 +120,7 @@ def _run_push(tmp_path, complete_response, failing=("bob",)):
          patch.object(push_results, "load_all_scores", return_value=scores), \
          patch.object(push_results, "upsert_developer", side_effect=fake_upsert), \
          patch("requests.post", side_effect=fake_post), \
+         patch("requests.get", return_value=task), \
          patch.dict("os.environ", {"HNTD_CLAIM_ID": "run-a"}), \
          patch("time.sleep"):
         result = push_results.main()
@@ -152,8 +161,8 @@ def test_deleted_search_ends_the_push_not_completed(tmp_path, capsys):
     assert "Search T9 was deleted while the pipeline ran" in capsys.readouterr().out
 
 
-# Issue #18: a run whose search was requeued or reset, and then claimed by another run, stores
-# nothing more and ends with a failure, so it stops.
+# A run whose search was requeued or reset, and then claimed by another run, stores nothing more
+# and ends with a failure, so it stops.
 def test_a_lost_claim_ends_the_push_not_completed(tmp_path, capsys):
     lost = _response(409, {"code": "claim_lost", "status": "processing",
                            "reason": "another run claimed the search"})
@@ -165,3 +174,32 @@ def test_a_lost_claim_ends_the_push_not_completed(tmp_path, capsys):
     assert "update-task-status" not in routes
     assert "pipeline-log" not in routes[routes.index("complete-task"):]
     assert "lost" in capsys.readouterr().out
+
+
+# Developers are global: a run that no longer holds its search must not overwrite their scores
+# before complete-task refuses it.
+@pytest.mark.parametrize("task", [
+    {"_id": "T9", "status": "processing", "claimId": "run-b"},
+    {"_id": "T9", "status": "pending"},
+    {"_id": "T9", "status": "completed", "claimId": "run-b"},
+])
+def test_a_run_that_no_longer_holds_the_search_pushes_nothing(tmp_path, capsys, task):
+    upserts = []
+    result, posts = _run_push(tmp_path, _response(200, {"ok": True}),
+                              task=_response(200, task), upserts=upserts)
+
+    assert result is False
+    assert upserts == []
+    assert [route for route, _ in posts if route != "pipeline-log"] == []
+    assert "This run lost search T9" in capsys.readouterr().out
+
+
+def test_a_search_deleted_before_the_push_pushes_nothing(tmp_path, capsys):
+    upserts = []
+    deleted = _response(404, {"error": "Task not found", "code": "task_not_found"})
+    result, posts = _run_push(tmp_path, _response(200, {"ok": True}), task=deleted, upserts=upserts)
+
+    assert result is False
+    assert upserts == []
+    assert [route for route, _ in posts if route != "pipeline-log"] == []
+    assert "Search T9 was deleted while the pipeline ran" in capsys.readouterr().out

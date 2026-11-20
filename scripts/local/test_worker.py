@@ -235,13 +235,13 @@ def http_error(status: int) -> requests.HTTPError:
 @pytest.fixture
 def backend(fake_claude, tmp_path, monkeypatch):
     """The worker's state files under tmp_path and a backend that holds no task: get_task raises
-    `backend.error` (a 404, as for a deleted search). Status updates are recorded."""
+    `backend.error` (TaskNotFound, as for a deleted search). Status updates are recorded."""
     monkeypatch.setattr(worker, "ROOT", tmp_path)
     monkeypatch.setattr(worker, "WRITABLE", tmp_path / "skill" / "output")
     monkeypatch.setattr(worker, "STATUS", tmp_path / "status.json")
 
     class Backend:
-        error = http_error(404)
+        error = worker.convex_client.TaskNotFound("t1")
         updates = []
         claims = []
 
@@ -370,15 +370,15 @@ def test_a_granted_claim_runs_claude_holding_it(worker_run, monkeypatch):
     assert worker.process("t1", {"ok": True}) is True
     [(task_id, claim_id)] = claims
     assert task_id == "t1" and claim_id
-    # Issue #18: the run writes with the worker's claim, and a crash recovery knows it.
+    # The run writes with the worker's claim, and a crash recovery knows it.
     assert started.read_text().strip() == claim_id
     assert json.loads(state["inflight_seen"].read_text())["claimId"] == claim_id
     assert not worker.INFLIGHT.exists()
     assert writes == []
 
 
-# Issue #18: a run whose search was requeued or reset and claimed again must not overwrite the
-# new run's work. The worker writes only with the claim it took, and a refusal ends its turn.
+# A run whose search was requeued or reset and claimed again must not overwrite the new run's
+# work. The worker writes only with the claim it took, and a refusal ends its turn.
 
 def test_each_search_gets_its_own_claim(worker_run, monkeypatch):
     claims = []
@@ -429,4 +429,4 @@ def test_a_crashed_run_from_an_older_worker_without_a_claim_is_dropped(worker_ru
     worker.recover_inflight()
     assert writes == []
     assert not worker.INFLIGHT.exists()
-    assert "t1" in capsys.readouterr().out
+    assert "/github-hr reset t1" in capsys.readouterr().out

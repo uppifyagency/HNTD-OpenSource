@@ -335,7 +335,7 @@ class TestRefinedStrategyPriorityTier:
         )
 
 
-# Issue #18: a run that lost its search to another run (after a requeue or a reset) must stop.
+# A run that lost its search to another run (after a requeue or a reset) must stop.
 # Persisting pass results is otherwise best-effort: a network error does not end the run.
 class TestPassResultsWrite:
     def _run_main(self, tmp_path, monkeypatch, error):

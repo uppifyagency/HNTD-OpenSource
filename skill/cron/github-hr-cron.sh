@@ -69,6 +69,7 @@ if [ "$(date +%u)" = "1" ]; then
   (cd "$PROJECT_DIR/skill/scripts" && .venv/bin/python refresh_activity.py) >> "$LOG_FILE" 2>&1
 fi
 
+export HNTD_CLAIM_ID="cron-$(uuidgen)"
 "$CLAUDE_BIN" -p "/github-hr run" >> "$LOG_FILE" 2>&1
 
 echo "=== Completed — $(date) ===" >> "$LOG_FILE"

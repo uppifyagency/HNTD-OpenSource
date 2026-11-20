@@ -24,8 +24,6 @@ import time
 import uuid
 from pathlib import Path
 
-import requests
-
 ROOT = Path(__file__).resolve().parents[2]
 SKILL_ENV = ROOT / "skill" / "scripts" / ".env"
 STATE_DIR = ROOT / ".convex"
@@ -238,7 +236,6 @@ def redact_token(log_path: Path, token: str | None) -> str:
 def run_claude(task_id: str, claim_id: str, log_path: Path) -> dict:
     """Run the pipeline for one task. Returns the CLI's final `result` message (or {})."""
     cmd = claude_command(f"/github-hr run --task {task_id}")
-    # The run's writes, its own `convex_client.py claim` included, carry the worker's claim.
     env = dict(pipeline_env(), **{convex_client.CLAIM_ID_ENV: claim_id})
     with log_path.open("w") as out:
         proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=out,
@@ -249,14 +246,11 @@ def run_claude(task_id: str, claim_id: str, log_path: Path) -> dict:
 
 
 def fail_if_unfinished(task_id: str, claim_id: str, reason: str) -> None:
-    """Mark the task failed unless it is finished. A deleted search (the backend answers 404)
-    and a lost claim count as finished. Any other error propagates, so the caller keeps INFLIGHT
-    and retries."""
+    """Mark the task failed unless it is finished. A deleted search and a lost claim count as
+    finished. Any other error propagates, so the caller keeps INFLIGHT and retries."""
     try:
         status = convex_client.get_task(task_id).get("status")
-    except requests.HTTPError as exc:
-        if exc.response is None or exc.response.status_code != 404:
-            raise
+    except convex_client.TaskNotFound:
         log(f"{task_id}: the search was deleted, nothing to mark failed")
         return
     if status not in FINISHED:
@@ -289,7 +283,8 @@ def recover_inflight() -> None:
                            "Interrotta: il worker locale si e' fermato durante l'elaborazione. "
                            "Crea di nuovo la ricerca per riprovare.")
     else:  # an older worker wrote INFLIGHT without its claim: nothing it may write any more
-        log(f"{data['taskId']}: left by a worker that recorded no claim id, so it cannot be marked failed")
+        log(f"{data['taskId']}: left by a worker that recorded no claim id, so it stays processing; "
+            f"run /github-hr reset {data['taskId']} to queue it again")
     INFLIGHT.unlink()
 
 

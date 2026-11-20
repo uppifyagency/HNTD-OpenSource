@@ -12,7 +12,8 @@ import glob as globmod
 
 # Add parent to path for convex_client import
 sys.path.insert(0, os.path.dirname(__file__))
-from convex_client import ClaimLost, TaskNotFound, upsert_developer, complete_task, log_pipeline_event
+from convex_client import (ClaimLost, TaskNotFound, complete_task, get_task, log_pipeline_event,
+                           run_claim_id, upsert_developer)
 import pass_io
 
 
@@ -24,6 +25,10 @@ if not TASK_ID:
     sys.exit(1)
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
+
+_DELETED = "Search {task_id} was deleted while the pipeline ran; its results were not stored."
+_LOST = ("This run lost search {task_id} to another run after a requeue or a reset; "
+         "its results were not stored. Stop this run. ({why})")
 
 
 def load_fetch_data():
@@ -777,6 +782,19 @@ def main():
         print(f"  Trimmed to top {max_results} developers by compositeScore "
               f"(fallback normalizedScore -> score) ({len(profiles)} remaining)")
 
+    # Developers are global: a run that lost its search must not overwrite their scores.
+    if not DRY_RUN:
+        try:
+            task = get_task(TASK_ID)
+        except TaskNotFound:
+            print(_DELETED.format(task_id=TASK_ID))
+            return False
+        status = task.get("status")
+        if status != "processing" or task.get("claimId") != run_claim_id():
+            why = "another run holds it" if status == "processing" else f"the search is {status}"
+            print(_LOST.format(task_id=TASK_ID, why=why))
+            return False
+
     developer_ids = []
     pushed = 0
     errors = 0
@@ -844,11 +862,10 @@ def main():
         try:
             result = complete_task(TASK_ID, developer_ids, error=error_msg)
         except TaskNotFound:
-            print(f"Search {TASK_ID} was deleted while the pipeline ran; its results were not stored.")
+            print(_DELETED.format(task_id=TASK_ID))
             return False
         except ClaimLost as exc:
-            print(f"This run lost search {TASK_ID} to another run after a requeue or a reset; "
-                  f"its results were not stored. Stop this run. ({exc})")
+            print(_LOST.format(task_id=TASK_ID, why=exc))
             return False
         print(f"  Task completed: {result}")
         if errors:
