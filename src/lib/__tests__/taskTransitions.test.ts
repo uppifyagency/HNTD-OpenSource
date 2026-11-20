@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   SETTABLE_STATUSES,
+  checkClaim,
   checkStatusTransition,
   type TaskStatus,
 } from "../../../convex/taskTransitions";
@@ -48,5 +49,41 @@ describe("a refused move to processing", () => {
     const verdict = checkStatusTransition(from, "processing");
     expect(verdict.allowed).toBe(false);
     if (!verdict.allowed) expect(verdict.reason).toMatch(/reset/);
+  });
+});
+
+// Issue #18: after a requeue or a reset, a second run claims the search while the first is still
+// alive. Only the run whose claim token is the current one may write; every other write is
+// refused, and the refusal tells the old run why.
+describe("checkClaim", () => {
+  const held = { status: "processing" as const, claimId: "run-a" };
+
+  it("lets the run that holds the claim write", () => {
+    expect(checkClaim(held, "run-a")).toEqual({ allowed: true });
+  });
+
+  it("refuses a run whose claim another run took over", () => {
+    const verdict = checkClaim({ status: "processing", claimId: "run-b" }, "run-a");
+    expect(verdict.allowed).toBe(false);
+    if (!verdict.allowed) expect(verdict.reason).toMatch(/another run claimed/);
+  });
+
+  it.each(["pending", "completed", "failed"] as const)(
+    "refuses a write to a %s search the run no longer holds",
+    (status) => {
+      const verdict = checkClaim({ status }, "run-a");
+      expect(verdict.allowed).toBe(false);
+      if (!verdict.allowed) expect(verdict.reason).toContain(`the search is ${status}`);
+    }
+  );
+
+  it("accepts an exact repeat of the run's own terminal write", () => {
+    expect(checkClaim({ status: "failed", claimId: "run-a" }, "run-a", "failed")).toEqual({ allowed: true });
+    expect(checkClaim({ status: "completed", claimId: "run-a" }, "run-a", "completed")).toEqual({ allowed: true });
+  });
+
+  it("refuses a different write after the run's own terminal write", () => {
+    expect(checkClaim({ status: "completed", claimId: "run-a" }, "run-a", "failed").allowed).toBe(false);
+    expect(checkClaim({ status: "failed", claimId: "run-a" }, "run-a").allowed).toBe(false);
   });
 });

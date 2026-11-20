@@ -112,6 +112,7 @@ def _run_push(tmp_path, complete_response, failing=("bob",)):
          patch.object(push_results, "load_all_scores", return_value=scores), \
          patch.object(push_results, "upsert_developer", side_effect=fake_upsert), \
          patch("requests.post", side_effect=fake_post), \
+         patch.dict("os.environ", {"HNTD_CLAIM_ID": "run-a"}), \
          patch("time.sleep"):
         result = push_results.main()
     return result, posts
@@ -124,6 +125,7 @@ def test_partial_push_completes_once_with_the_error_note(tmp_path):
     writes = [(route, body) for route, body in posts if route != "pipeline-log"]
     assert writes == [("complete-task", {
         "taskId": "T9",
+        "claimId": "run-a",
         "developerIds": ["dev-alice"],
         "error": "Partial: 1 developer(s) failed to push out of 2 attempted",
     })]
@@ -134,7 +136,7 @@ def test_full_push_sends_no_error_note(tmp_path):
 
     assert result is not False
     completes = [body for route, body in posts if route == "complete-task"]
-    assert completes == [{"taskId": "T9", "developerIds": ["dev-alice", "dev-bob"]}]
+    assert completes == [{"taskId": "T9", "claimId": "run-a", "developerIds": ["dev-alice", "dev-bob"]}]
 
 
 def test_deleted_search_ends_the_push_not_completed(tmp_path, capsys):
@@ -148,3 +150,18 @@ def test_deleted_search_ends_the_push_not_completed(tmp_path, capsys):
     # Nothing is logged for a search that no longer exists.
     assert "pipeline-log" not in routes[routes.index("complete-task"):]
     assert "Search T9 was deleted while the pipeline ran" in capsys.readouterr().out
+
+
+# Issue #18: a run whose search was requeued or reset, and then claimed by another run, stores
+# nothing more and ends with a failure, so it stops.
+def test_a_lost_claim_ends_the_push_not_completed(tmp_path, capsys):
+    lost = _response(409, {"code": "claim_lost", "status": "processing",
+                           "reason": "another run claimed the search"})
+    result, posts = _run_push(tmp_path, lost)
+
+    assert result is False
+    routes = [route for route, _ in posts]
+    assert routes.count("complete-task") == 1
+    assert "update-task-status" not in routes
+    assert "pipeline-log" not in routes[routes.index("complete-task"):]
+    assert "lost" in capsys.readouterr().out
