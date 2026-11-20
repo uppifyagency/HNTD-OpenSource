@@ -1,6 +1,10 @@
-// Which task status changes the pipeline may make. `tasks.updateTaskStatus`, `tasks.claimTask`
-// and `tasks.completeTask` ask the table below before every write. A reset (`tasks.resetTask`,
-// `tasks.internalResetTask`) and a delete do not: they are the user's way out of any status.
+// Which pipeline writes the server accepts. `tasks.claimTask` asks the status table below
+// before it starts a search. Every later write of a run (`tasks.updateTaskStatus`,
+// `tasks.completeTask`, `tasks.updateJdProfile`, `tasks.updatePassResults`) asks `checkClaim`:
+// only the run whose claim token is the search's current one may write (issue #18). A reset
+// (`tasks.resetTask`, `tasks.internalResetTask`), the watchdog's requeue
+// (`tasks.requeueStaleTask`) and a delete ask neither: they are the way out of any status, and
+// they clear the claim.
 // Pure: no Convex imports and no process.env, so vitest can import it.
 
 export type TaskStatus = "pending" | "processing" | "completed" | "failed";
@@ -50,4 +54,22 @@ const TRANSITIONS: Record<TaskStatus, Record<TaskStatus, TransitionVerdict>> = {
 
 export function checkStatusTransition(from: TaskStatus, to: TaskStatus): TransitionVerdict {
   return TRANSITIONS[from][to];
+}
+
+// A write from the run holding `claimId`, toward `to` when it sets a status. The run holds the
+// search while it is processing under its claim. `to` equal to the current status is the run
+// repeating its own terminal write after a lost response, which changes nothing.
+export function checkClaim(
+  task: { status: TaskStatus; claimId?: string },
+  claimId: string,
+  to?: TaskStatus
+): TransitionVerdict {
+  if (task.claimId !== undefined && task.claimId !== claimId) {
+    return {
+      allowed: false,
+      reason: "another run claimed the search after this run's claim was requeued or reset",
+    };
+  }
+  if (task.claimId === claimId && (task.status === "processing" || task.status === to)) return ALLOW;
+  return { allowed: false, reason: `the search is ${task.status} and this run no longer holds it` };
 }

@@ -6,7 +6,6 @@ import json
 import os
 import sys
 import time
-import uuid
 import requests
 from dotenv import load_dotenv
 
@@ -77,53 +76,81 @@ class TaskNotFound(Exception):
     pass
 
 
-def _post_task(route: str, body: dict):
-    """POST to a task route. Raises TaskNotFound when the backend says the task is gone.
+class ClaimLost(Exception):
+    """The backend refused a write: another run holds the search now (issue #18). The run must
+    stop: no retry, no failed status, no reset."""
 
-    Only the route's own answer counts (code "task_not_found"): a backend that does not serve
-    the route yet also answers 404, and that is an error, not a deleted task."""
+    def __init__(self, task_id: str, reason: str):
+        super().__init__(f"{task_id}: {reason}")
+
+
+class NoRunIdentity(Exception):
+    pass
+
+
+CLAIM_ID_ENV = "HNTD_CLAIM_ID"  # set by scripts/local/worker.py for the run it starts
+
+
+def run_claim_id() -> str:
+    """The claim token of this pipeline run: HNTD_CLAIM_ID, else the Claude Code session, which
+    every Bash call of one run shares, subagents included."""
+    claim_id = os.environ.get(CLAIM_ID_ENV)
+    if claim_id:
+        return claim_id
+    session = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    if session:
+        return f"claude-session:{session}"
+    raise NoRunIdentity(f"No run identity for the claim: set {CLAIM_ID_ENV}, or run this inside "
+                        "Claude Code (CLAUDE_CODE_SESSION_ID).")
+
+
+def _post_task(route: str, body: dict):
+    """POST to a task route. Raises TaskNotFound when the backend says the task is gone, and
+    ClaimLost when it refuses the write because this run no longer holds the task.
+
+    Only the route's own answer counts (its `code`): a backend that does not serve the route yet
+    also answers 404, and that is an error, not a deleted task."""
     try:
         return _request_with_retry(requests.post, f"{CONVEX_URL}{route}", json=body)
     except requests.exceptions.HTTPError as exc:
         resp = exc.response
-        if resp is not None and resp.status_code == 404:
+        if resp is not None and resp.status_code in (404, 409):
             try:
-                gone = resp.json().get("code") == "task_not_found"
+                answer = resp.json()
             except ValueError:
-                gone = False
-            if gone:
+                answer = {}
+            if resp.status_code == 404 and answer.get("code") == "task_not_found":
                 raise TaskNotFound(body["taskId"]) from exc
+            if resp.status_code == 409 and answer.get("code") == "claim_lost":
+                raise ClaimLost(body["taskId"], answer.get("reason", "claim lost")) from exc
         raise
 
 
-def complete_task(task_id: str, developer_ids: list[str], error: str = None):
+def complete_task(task_id: str, developer_ids: list[str], error: str = None, claim_id: str = None):
     """Store the result list and complete the task in one backend transaction. `error` is an
     optional note kept on the task. Raises TaskNotFound, storing nothing, if the task is gone."""
-    body = {"taskId": task_id, "developerIds": developer_ids}
+    body = {"taskId": task_id, "claimId": claim_id or run_claim_id(), "developerIds": developer_ids}
     if error:
         body["error"] = error
     return _post_task("/api/complete-task", body).json()
 
 
-def claim_task(task_id: str) -> dict:
+def claim_task(task_id: str, claim_id: str = None) -> dict:
     """Returns {"claimed": True}, or {"claimed": False, "status": <current status>} when the task
-    is not pending. Raises TaskNotFound when it is gone."""
-    # Generate once per logical claim so transport retries can recover a lost grant.
-    return _post_task("/api/claim-task", {"taskId": task_id, "claimId": str(uuid.uuid4())}).json()
-
-
-CLAIMED_BY_WORKER_ENV = "HNTD_CLAIMED_TASK"  # set by scripts/local/worker.py for the run it starts
+    is not pending. The run that already holds the claim is answered {"claimed": True} again.
+    Raises TaskNotFound when it is gone."""
+    return _post_task("/api/claim-task", {"taskId": task_id, "claimId": claim_id or run_claim_id()}).json()
 
 
 def claim_command(task_id: str) -> int:
-    """`convex_client.py claim <TASK_ID>`: may this run work on the task? Exit 0 yes, 3 refused,
-    4 not found. The local worker claims before it starts the run and names the task in
-    HNTD_CLAIMED_TASK; that run's own claim would be refused, so it is not sent."""
-    if os.environ.get(CLAIMED_BY_WORKER_ENV) == task_id:
-        print(f"Task {task_id}: the local worker already holds the claim.")
-        return 0
+    """`convex_client.py claim <TASK_ID>`: may this run work on the task? Exit 0 yes, 2 no run
+    identity, 3 refused, 4 not found. A run started by the local worker inherits the worker's
+    HNTD_CLAIM_ID, so its own claim is answered `claimed`."""
     try:
         claim = claim_task(task_id)
+    except NoRunIdentity as exc:
+        print(exc)
+        return 2
     except TaskNotFound:
         print(f"Task {task_id} not found.")
         return 4
@@ -136,14 +163,12 @@ def claim_command(task_id: str) -> int:
     return 3
 
 
-def update_task_status(task_id: str, status: str, error: str = None):
+def update_task_status(task_id: str, status: str, error: str = None, claim_id: str = None):
     """Set a task to pending or failed. claim_task starts a task, complete_task completes it."""
-    body = {"taskId": task_id, "status": status}
+    body = {"taskId": task_id, "claimId": claim_id or run_claim_id(), "status": status}
     if error:
         body["error"] = error
-    resp = _request_with_retry(requests.post, f"{CONVEX_URL}/api/update-task-status",
-                               json=body)
-    return resp.json()
+    return _post_task("/api/update-task-status", body).json()
 
 
 def get_task(task_id: str) -> dict:
@@ -228,16 +253,15 @@ def reconstruct_jd_profile_file(task_id: str, output_dir: str = None):
     return write_jd_profile_file(task_id, profile, output_dir or _OUTPUT_DIR)
 
 
-def update_jd_profile(task_id: str, jd_profile: dict) -> dict:
+def update_jd_profile(task_id: str, jd_profile: dict, claim_id: str = None) -> dict:
     """Update a task's JD Profile after parsing (JD-02 #24: now persists
     searchStrategies + locationHard via _build_jd_profile)."""
     payload = _strip_none({
         "taskId": task_id,
+        "claimId": claim_id or run_claim_id(),
         "jdProfile": _build_jd_profile(jd_profile),
     })
-    resp = _request_with_retry(requests.post, f"{CONVEX_URL}/api/update-jd-profile",
-                               json=payload)
-    return resp.json()
+    return _post_task("/api/update-jd-profile", payload).json()
 
 
 def get_users_dashboard() -> list:
@@ -340,7 +364,7 @@ def log_pipeline_event(task_id: str, phase: str, message: str,
         return {"ok": False}
 
 
-def update_pass_results(task_id: str, pass_results: list) -> dict:
+def update_pass_results(task_id: str, pass_results: list, claim_id: str = None) -> dict:
     """Update a task's pass results after feedback analysis.
     Appends/merges new pass entries into the existing passResults array
     so that Pass 1 data is preserved when Pass 2 is saved.
@@ -364,12 +388,13 @@ def update_pass_results(task_id: str, pass_results: list) -> dict:
 
     payload = {
         "taskId": task_id,
+        "claimId": claim_id or run_claim_id(),
         "passResults": merged_list,
     }
     try:
-        resp = _request_with_retry(requests.post, f"{CONVEX_URL}/api/update-pass-results",
-                                   json=payload)
-        return resp.json()
+        return _post_task("/api/update-pass-results", payload).json()
+    except ClaimLost:
+        raise
     except Exception as e:
         print(f"  [ERROR] update_pass_results failed: {e}")
         print(f"  [ERROR] payload was: {json.dumps(payload)[:500]}")

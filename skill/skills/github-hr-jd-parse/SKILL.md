@@ -118,6 +118,7 @@ jd_profile = json.load(open('skill/output/jd-profile-<TASK_ID>.json'))
 update_jd_profile('<TASK_ID>', jd_profile)
 "
 ```
+If this write raises `ClaimLost` (HTTP 409 `claim_lost`), another run holds the search now: stop at once and report it. Do not retry, do not mark the task failed, do not reset it.
 
 ### Step 5: Log summary
 

@@ -124,6 +124,12 @@ python skill/scripts/convex_client.py claim <TASK_ID>
   on it and do NOT mark it failed. With `--task`, print the command's output and stop. In queue
   mode, go to the next task.
 
+**Lost claim.** Every later write of this run (the JD profile, pass results, `failed`, the
+completion) carries its claim. A write that reports the claim lost (HTTP 409 `claim_lost`,
+`ClaimLost` in Python, or a script that says this run lost the search) means another run holds
+the search now, after a requeue or a reset: stop the run at once. Do not retry, do not mark it
+failed, do not reset it.
+
 Parse the task JSON. Set `mode = task.mode` ("jd" or "manual").
 
 **Log pipeline event:**

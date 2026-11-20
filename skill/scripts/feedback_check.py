@@ -284,27 +284,35 @@ def main():
     # JD-14: persist the pass outcome to Convex (best-effort — the endpoint
     # existed since day one but nothing ever called it, leaving the dashboard
     # blind on why a pass2 ran). Never fail the pipeline on a network error.
+    # A lost claim (issue #18) is not best-effort: another run holds the search, so this one stops.
     # NOTE: avgMatchConfidence carries the MEDIAN (the decision metric) when
     # available; refinementReason spells that out.
     try:
         # convex_client sys.exit()s AT IMPORT when CONVEX_SITE_URL/API_SECRET
         # are missing — SystemExit is a BaseException and would kill the run
-        from convex_client import update_pass_results
+        import convex_client
+    except BaseException as e:  # noqa: BLE001 (see the import note above)
+        print(f"[feedback] WARNING: passResults update failed (non-fatal): {e!r}")
+        return
+    try:
         # developersFound is PER-PASS: count score judgments from this pass
         devs_this_pass = sum(
             1 for e in pass_io.load_score_map(args.task_id, str(OUTPUT_DIR)).values()
             if e.get("fromPass") == args.pass_number
         )
-        update_pass_results(args.task_id, [{
+        convex_client.update_pass_results(args.task_id, [{
             "pass": args.pass_number,
             "developersFound": devs_this_pass,
             "avgMatchConfidence": round(median_confidence if median_confidence is not None else avg_confidence, 1),
             "refinementReason": f"{decision}: {reason}",
         }])
         print(f"[feedback] passResults persisted for pass {args.pass_number}")
-    except BaseException as e:  # noqa: BLE001 — see import note above
+    except convex_client.ClaimLost as e:
+        print(f"[feedback] STOP: another run holds this search now ({e}). Stop this run: "
+              "do not retry, do not mark it failed, do not reset it.")
+        sys.exit(3)
+    except Exception as e:
         print(f"[feedback] WARNING: passResults update failed (non-fatal): {e!r}")
-
 
 if __name__ == "__main__":
     main()

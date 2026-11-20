@@ -12,7 +12,7 @@ import glob as globmod
 
 # Add parent to path for convex_client import
 sys.path.insert(0, os.path.dirname(__file__))
-from convex_client import TaskNotFound, upsert_developer, complete_task, log_pipeline_event
+from convex_client import ClaimLost, TaskNotFound, upsert_developer, complete_task, log_pipeline_event
 import pass_io
 
 
@@ -845,6 +845,10 @@ def main():
             result = complete_task(TASK_ID, developer_ids, error=error_msg)
         except TaskNotFound:
             print(f"Search {TASK_ID} was deleted while the pipeline ran; its results were not stored.")
+            return False
+        except ClaimLost as exc:
+            print(f"This run lost search {TASK_ID} to another run after a requeue or a reset; "
+                  f"its results were not stored. Stop this run. ({exc})")
             return False
         print(f"  Task completed: {result}")
         if errors:

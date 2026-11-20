@@ -87,6 +87,7 @@ update_pass_results('{taskId}', [{{
 print('Pass results updated on Convex')
 "
 ```
+If this write raises `ClaimLost` (HTTP 409 `claim_lost`), another run holds the search now: stop at once and report it. Do not retry, do not mark the task failed, do not reset it.
 
 ### Step 4: Make decision
 

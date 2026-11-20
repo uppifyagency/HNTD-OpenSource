@@ -211,7 +211,7 @@ def fake_claude(tmp_path, monkeypatch):
 
 def test_run_log_is_private_and_holds_no_token(fake_claude):
     log_path = worker.new_log("t1")
-    final = worker.run_claude("t1", log_path)
+    final = worker.run_claude("t1", "c1", log_path)
     assert oct(worker.LOG_DIR.stat().st_mode & 0o777) == "0o700"
     assert oct(log_path.stat().st_mode & 0o777) == "0o600"
     assert "saved-token-value-123" not in log_path.read_text()

@@ -4,11 +4,13 @@
 // plain throw would have shipped a carefully worded quota explanation that nobody ever sees.
 import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { assertAdmin, requireCurrentUser, getAdminEmails } from "./users";
 import { canGrantAdmin } from "./adminAuthz";
 import { checkTaskQuota } from "./planLimits";
 import {
   SETTABLE_STATUSES,
+  checkClaim,
   checkStatusTransition,
   type TaskStatus,
 } from "./taskTransitions";
@@ -148,15 +150,17 @@ export const getPendingTasks = internalQuery({
   },
 });
 
-function assertTransition(from: TaskStatus, to: TaskStatus) {
-  const verdict = checkStatusTransition(from, to);
+// A run that lost its claim must stop (issue #18): POST routes answer HTTP 409 `claim_lost`.
+function assertHoldsClaim(
+  task: Doc<"tasks"> | null,
+  claimId: string,
+  to?: TaskStatus
+): asserts task is Doc<"tasks"> {
+  const verdict = task
+    ? checkClaim(task, claimId, to)
+    : { allowed: false as const, reason: "the search was deleted" };
   if (!verdict.allowed) {
-    throw new ConvexError({
-      code: "invalid_transition",
-      error: `Invalid task status transition: ${from} → ${to}: ${verdict.reason}`,
-      from,
-      to,
-    });
+    throw new ConvexError({ code: "claim_lost", reason: verdict.reason, status: task?.status ?? null });
   }
 }
 
@@ -164,21 +168,23 @@ function truncateError(error: string | undefined) {
   return error && error.length > 2000 ? error.slice(0, 2000) + "... [truncated]" : error;
 }
 
-// Sets `pending` or `failed`; only `claimTask` starts a search and only `completeTask` completes one.
+// The run holding the claim hands its search back (`pending`) or fails it (`failed`); only
+// `claimTask` starts a search and only `completeTask` completes one. `failed` keeps the claim, so
+// the same run repeating the write after a lost response is recognised.
 export const updateTaskStatus = internalMutation({
   args: {
     taskId: v.id("tasks"),
+    claimId: v.string(),
     status: v.union(...SETTABLE_STATUSES.map((s) => v.literal(s))),
     error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
-    if (!task) throw new Error("Task not found");
-    assertTransition(task.status, args.status);
+    assertHoldsClaim(task, args.claimId, args.status);
 
-    const updates: Record<string, unknown> = { status: args.status, claimId: undefined };
-    if (args.status === "failed") {
-      updates.processingStartedAt = undefined;
+    const updates: Partial<Doc<"tasks">> = { status: args.status, processingStartedAt: undefined };
+    if (args.status === "pending") {
+      updates.claimId = undefined;
     }
     const errorMsg = truncateError(args.error);
     if (errorMsg) updates.error = errorMsg;
@@ -190,7 +196,7 @@ export const updateTaskStatus = internalMutation({
 // so of two runs that claim the same search only one is granted it. A refusal is an
 // expected answer, not an error: the caller leaves the search alone.
 export const claimTask = internalMutation({
-  args: { taskId: v.id("tasks"), claimId: v.optional(v.string()) },
+  args: { taskId: v.id("tasks"), claimId: v.string() },
   returns: v.union(
     v.object({ outcome: v.literal("claimed") }),
     v.object({
@@ -207,7 +213,7 @@ export const claimTask = internalMutation({
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) return { outcome: "task_not_found" as const };
-    if (task.status === "processing" && args.claimId !== undefined && task.claimId === args.claimId) {
+    if (task.status === "processing" && task.claimId === args.claimId) {
       return { outcome: "claimed" as const };
     }
     if (!checkStatusTransition(task.status, "processing").allowed) {
@@ -219,10 +225,12 @@ export const claimTask = internalMutation({
 });
 
 // Stores a search's result list and marks it completed in one transaction, so a search deleted
-// meanwhile gets no orphan result list and a completed search always has one.
+// meanwhile gets no orphan result list and a completed search always has one. The completed
+// search keeps the claim of the run that completed it, so that run's retry stores nothing twice.
 export const completeTask = internalMutation({
   args: {
     taskId: v.id("tasks"),
+    claimId: v.string(),
     developerIds: v.array(v.id("developers")),
     error: v.optional(v.string()),
   },
@@ -233,7 +241,8 @@ export const completeTask = internalMutation({
     }
     const task = await ctx.db.get(args.taskId);
     if (!task) return "task_not_found";
-    assertTransition(task.status, "completed");
+    if (task.status === "completed" && task.claimId === args.claimId) return "completed";
+    assertHoldsClaim(task, args.claimId);
 
     const now = Date.now();
     await ctx.db.insert("taskResults", {
@@ -246,7 +255,6 @@ export const completeTask = internalMutation({
       status: "completed",
       completedAt: now,
       resultCount: args.developerIds.length,
-      claimId: undefined,
       processingStartedAt: undefined,
       ...(errorMsg ? { error: errorMsg } : {}),
     });
@@ -415,6 +423,7 @@ export const deleteOwnTask = mutation({
 export const updateJdProfile = internalMutation({
   args: {
     taskId: v.id("tasks"),
+    claimId: v.string(),
     jdProfile: v.object({
       extractedParams: v.object({
         languages: v.array(v.string()),
@@ -452,6 +461,7 @@ export const updateJdProfile = internalMutation({
     }),
   },
   handler: async (ctx, args) => {
+    assertHoldsClaim(await ctx.db.get(args.taskId), args.claimId);
     await ctx.db.patch(args.taskId, { jdProfile: args.jdProfile });
   },
 });
@@ -459,6 +469,7 @@ export const updateJdProfile = internalMutation({
 export const updatePassResults = internalMutation({
   args: {
     taskId: v.id("tasks"),
+    claimId: v.string(),
     passResults: v.array(
       v.object({
         pass: v.number(),
@@ -477,6 +488,7 @@ export const updatePassResults = internalMutation({
         throw new Error("avgMatchConfidence must be between 0 and 100");
       }
     }
+    assertHoldsClaim(await ctx.db.get(args.taskId), args.claimId);
     await ctx.db.patch(args.taskId, { passResults: args.passResults });
   },
 });
@@ -643,6 +655,12 @@ export const internalGetJobsDashboard = internalQuery({
   },
 });
 
+// When a stale search started processing, or null when it is not stale.
+function staleSince(task: Doc<"tasks">, staleThresholdMs: number, now: number): number | null {
+  const startedAt = task.status === "processing" ? task.processingStartedAt : undefined;
+  return startedAt !== undefined && now - startedAt > staleThresholdMs ? startedAt : null;
+}
+
 export const getStaleProcessingTasks = internalQuery({
   args: { staleThresholdMs: v.number() },
   handler: async (ctx, args) => {
@@ -651,10 +669,26 @@ export const getStaleProcessingTasks = internalQuery({
       .withIndex("by_status", (q) => q.eq("status", "processing"))
       .collect();
     const now = Date.now();
-    return processing.filter(
-      (t) =>
-        t.processingStartedAt !== undefined &&
-        now - t.processingStartedAt > args.staleThresholdMs
-    );
+    return processing.filter((t) => staleSince(t, args.staleThresholdMs, now) !== null);
+  },
+});
+
+// The watchdog's requeue. It re-reads the search in its own transaction, so a search that
+// completed, failed or was claimed again since the stale read is left alone. Clearing the claim
+// makes every later write of the old run fail with `claim_lost`.
+export const requeueStaleTask = internalMutation({
+  args: { taskId: v.id("tasks"), staleThresholdMs: v.number() },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    const since = task && staleSince(task, args.staleThresholdMs, Date.now());
+    if (since === null) return false;
+    await ctx.db.patch(args.taskId, {
+      status: "pending",
+      claimId: undefined,
+      processingStartedAt: undefined,
+      error: `Auto-recovered: stuck processing since ${new Date(since).toISOString()}`,
+    });
+    return true;
   },
 });
